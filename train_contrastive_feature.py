@@ -57,7 +57,7 @@ def get_quantile_func(scales: torch.Tensor, distribution="normal"):
         scales = scales.reshape(-1,1)
         return torch.Tensor(
             quantile_transformer.transform(scales.detach().cpu().numpy())
-        ).to(scales.device)
+        )
 
     return quantile_transformer_func
 
@@ -84,7 +84,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
         torch.nn.Linear(1, 32, bias=True),
         torch.nn.Sigmoid()
     )
-    scale_gate = scale_gate.cuda()
+    scale_gate = scale_gate
     scale_gate.train()
 
     param_group = {'params': scale_gate.parameters(), 'lr': opt.feature_lr, 'name': 'f'}
@@ -95,10 +95,10 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
     del gaussians
     torch.cuda.empty_cache()
 
-    background = torch.ones([dataset.feature_dim], dtype=torch.float32, device="cuda") if dataset.white_background else torch.zeros([dataset.feature_dim], dtype=torch.float32, device="cuda")
+    background = torch.ones([dataset.feature_dim], dtype=torch.float32) if dataset.white_background else torch.zeros([dataset.feature_dim], dtype=torch.float32)
 
-    iter_start = torch.cuda.Event(enable_timing = True)
-    iter_end = torch.cuda.Event(enable_timing = True)
+    iter_start = time.time
+    iter_end = time.time
     
     first_iter = 0
     viewpoint_stack = None
@@ -117,7 +117,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
 
     # all_scales = []
     # for cam in scene.getTrainCameras():
-    #     cam.mask_scales = torch.clamp(cam.mask_scales, 0, upper_bound_scale)
+    #     cam.mask_scales = torch.clamp(cam.mask_scales, 0, upper_bound_scale)0
     #     all_scales.append(cam.mask_scales)
     # all_scales = torch.cat(all_scales)
 
@@ -128,10 +128,10 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
         q_trans = get_quantile_func(all_scales, "uniform")
     else:
         q_trans = get_quantile_func(all_scales, "uniform")
-        fixed_scale_gate = torch.tensor([[1 for j in range(32 - scale_aware_dim + i)] + [0 for k in range(scale_aware_dim - i)] for i in range(scale_aware_dim+1)]).cuda()
+        fixed_scale_gate = torch.tensor([[1 for j in range(32 - scale_aware_dim + i)] + [0 for k in range(scale_aware_dim - i)] for i in range(scale_aware_dim+1)])
 
     for iteration in range(first_iter, opt.iterations + 1):
-        iter_start.record()
+        start_time = iter_start()
 
         # Pick a random Camera
         if not viewpoint_stack:
@@ -144,11 +144,11 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
         
         with torch.no_grad():
             # N_mask, H, W
-            sam_masks = viewpoint_cam.original_masks.cuda().float()
+            sam_masks = viewpoint_cam.original_masks.float()
             viewpoint_cam.feature_height, viewpoint_cam.feature_width = viewpoint_cam.image_height, viewpoint_cam.image_width
 
             # N_mask
-            mask_scales = viewpoint_cam.mask_scales.cuda()
+            mask_scales = viewpoint_cam.mask_scales
 
             mask_scales, sort_indices = torch.sort(mask_scales, descending=True)
             sam_masks = sam_masks[sort_indices, :, :]
@@ -171,7 +171,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
 
             ray_sample_rate = opt.ray_sample_rate if opt.ray_sample_rate > 0 else opt.num_sampled_rays / (sam_masks.shape[-1] * sam_masks.shape[-2])
 
-            sampled_ray = torch.rand(sam_masks.shape[-2], sam_masks.shape[-1]).cuda() < ray_sample_rate
+            sampled_ray = torch.rand(sam_masks.shape[-2], sam_masks.shape[-1]) < ray_sample_rate
             non_mask_region = sam_masks.sum(dim = 0) == 0
 
             sampled_ray = torch.logical_and(sampled_ray, ~non_mask_region)
@@ -244,7 +244,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
             gates = fixed_scale_gate[int_sampled_scales].detach()
 
         # N_sampled_scales C H W
-        feature_with_scale = rendered_features.unsqueeze(0).repeat([sampled_scales.shape[0],1,1,1])
+        feature_with_scale = rendered_features.cpu().unsqueeze(0).repeat([sampled_scales.shape[0],1,1,1])
         feature_with_scale = feature_with_scale * gates.unsqueeze(-1).unsqueeze(-1)
 
         sampled_feature_with_scale = feature_with_scale[:,:,sampled_ray]
@@ -254,7 +254,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
         scale_conditioned_features_sam = torch.nn.functional.normalize(scale_conditioned_features_sam, dim=-1, p=2)
         corr = torch.einsum('nhc,njc->nhj', scale_conditioned_features_sam, scale_conditioned_features_sam)
 
-        diag_mask = torch.eye(corr.shape[1], dtype=bool, device=corr.device)
+        diag_mask = torch.eye(corr.shape[1], dtype=bool)
 
         sum_0 = gt_corrs.sum(dim = 0)
         consistent_negative = sum_0 == 0
@@ -303,7 +303,7 @@ def training(dataset, opt, pipe, iteration, saving_iterations, checkpoint_iterat
         feature_gaussians.optimizer.step()
         feature_gaussians.optimizer.zero_grad(set_to_none = True)
 
-        iter_end.record()
+        end_time = iter_end()
 
         if iteration % 10 == 0:
             progress_bar.set_postfix({

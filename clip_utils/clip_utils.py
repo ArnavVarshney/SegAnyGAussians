@@ -11,7 +11,7 @@ class OpenCLIPNetworkConfig:
     clip_model_type: str = "ViT-B-16"
     # ViT-B-16-laion2b_s34b_b88k.bin, laion/CLIP-ViT-H-14-laion2B-s32B-b79K
     # clip_model_pretrained: str = "./clip_ckpt/ViT-H-14-laion2B-s32B-b79K.bin"
-    clip_model_pretrained: str = "../sagav2/clip_ckpt/ViT-B-16-laion2b_s34b_b88k.bin"
+    clip_model_pretrained: str = "/userhome/30/varshney/CLIP-ViT-B-16-laion2B-s34B-b88K/open_clip_pytorch_model.bin"
     clip_n_dims: int = 512
     negatives: Tuple[str] = ("object", "things", "stuff", "texture", )
     # negatives: Tuple[str] = (

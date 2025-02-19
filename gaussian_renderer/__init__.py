@@ -304,6 +304,7 @@ def render_contrastive_feature(viewpoint_camera, pc : FeatureGaussianModel, pipe
     Background tensor (bg_color) must be on GPU!
     """
  
+    bg_color = bg_color.cuda()
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
     try:
