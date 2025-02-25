@@ -82,6 +82,8 @@ if __name__ == '__main__':
     dataset = model.extract(args)
     dataset.need_features = False
     dataset.need_masks = False
+    dataset.resolution = 2
+    dataset.data_device = 'cuda'
 
     # ALLOW_PRINCIPLE_POINT_SHIFT = 'lerf' in args.model_path
     dataset.allow_principle_point_shift = ALLOW_PRINCIPLE_POINT_SHIFT
