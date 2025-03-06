@@ -668,6 +668,7 @@ class GaussianSplattingGUI:
                 self.engine._rotation       # (N, 4)
                 self.engine._objects_dc     # (N, 1, 16)
                 """
+                print("Segmenting in 3D")
                 self.segment3d_flag = False
                 feat_pts = self.engine['feature'].get_point_features.squeeze()
                 scale_gated_feat_pts = feat_pts * self.gates.unsqueeze(0)
@@ -685,6 +686,7 @@ class GaussianSplattingGUI:
                 #     pass
                 self.engine['scene'].segment(self.score_pts_binary)
                 self.engine['feature'].segment(self.score_pts_binary)
+                print("Segmentation finished")
 
         if self.save_flag:
             print("Saving ...")
