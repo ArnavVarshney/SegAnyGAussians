@@ -25,8 +25,8 @@ from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 
 from scipy.spatial.transform import Rotation as R
 
-# from cuml.cluster.hdbscan import HDBSCAN
-from hdbscan import HDBSCAN
+from cuml.cluster.hdbscan import HDBSCAN
+# from hdbscan import HDBSCAN
 
 def depth2img(depth):
     depth = (depth-depth.min())/(depth.max()-depth.min() + 1e-7)
@@ -56,7 +56,7 @@ class CONFIG:
     white_background = False
 
     FEATURE_DIM = 32
-    MODEL_PATH = './output/figurines' # 30000
+    MODEL_PATH = './output/garden' # 30000
 
     FEATURE_GAUSSIAN_ITERATION = 10000
     SCENE_GAUSSIAN_ITERATION = 30000
