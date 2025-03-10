@@ -480,7 +480,7 @@ class GaussianSplattingGUI:
         if self.seg_score is None:
             print("No clusters have been identified yet.")
             return
-            
+                
         os.makedirs("./segmentation_res/clusters", exist_ok=True)
         
         cluster_assignments = self.seg_score.argmax(dim=-1)
@@ -495,9 +495,19 @@ class GaussianSplattingGUI:
             threshold = dpg.get_value('_ScoreThres') if dpg.does_item_exist('_ScoreThres') else 0.5
             final_mask = cluster_mask & (confidence > threshold)
 
+            if final_mask.sum() < 10:
+                print(f"Skipping cluster {cluster_id} as it has too few points after thresholding")
+                continue
+                
             os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
             
             torch.save(final_mask, f"./segmentation_res/clusters/{cluster_id}/mask.pt")
+            
+            with open(f"./segmentation_res/clusters/{cluster_id}/info.txt", "w") as f:
+                f.write(f"Cluster ID: {cluster_id}\n")
+                f.write(f"Points in cluster: {final_mask.sum().item()}\n")
+                f.write(f"Confidence threshold: {threshold}\n")
+                f.write(f"RGB color: {self.label_to_color[cluster_id].tolist()}\n")
         
         print(f"All {num_clusters} cluster masks saved to ./segmentation_res/clusters/")
 
