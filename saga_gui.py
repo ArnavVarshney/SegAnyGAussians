@@ -349,7 +349,7 @@ class GaussianSplattingGUI:
             dpg.add_text("Mouse position: click anywhere to start. ", tag="pos_item")
             dpg.add_slider_float(label="Scale", default_value=0.5,
                                  min_value=0.0, max_value=1.0, tag="_Scale")
-            dpg.add_slider_float(label="ScoreThres", default_value=0.0,
+            dpg.add_slider_float(label="ScoreThres", default_value=0.9,
                                  min_value=0.0, max_value=1.0, tag="_ScoreThres")
             # dpg.add_button(label="render_option", tag="_button_depth",
                             # callback=callback_depth)
