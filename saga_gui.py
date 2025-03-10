@@ -348,12 +348,12 @@ class GaussianSplattingGUI:
         def render_all_masks_callback():
             self.render_all_cluster_masks()
         # control window
-        with dpg.window(label="Control", tag="_control_window", width=300, height=550, pos=[self.window_width+10, 0]):
+        with dpg.window(label="Control", tag="_control_window", width=300, height=self.window_height, pos=[self.window_width+10, 0]):
 
             dpg.add_text("Mouse position: click anywhere to start. ", tag="pos_item")
-            dpg.add_slider_float(label="Scale", default_value=0.5,
+            dpg.add_slider_float(label="Scale", default_value=1,
                                  min_value=0.0, max_value=1.0, tag="_Scale")
-            dpg.add_slider_float(label="ScoreThres", default_value=0.9,
+            dpg.add_slider_float(label="ScoreThres", default_value=0.85,
                                  min_value=0.0, max_value=1.0, tag="_ScoreThres")
             # dpg.add_button(label="render_option", tag="_button_depth",
                             # callback=callback_depth)
@@ -517,13 +517,14 @@ class GaussianSplattingGUI:
     def render_all_cluster_masks(self):
         from gaussian_renderer import render
         from copy import deepcopy
+        import re
 
         clusters_root = "./segmentation_res/clusters"
         if not os.path.exists(clusters_root):
             print("No cluster masks found at ./segmentation_res/clusters/")
             return
-            
-        cluster_dirs = sorted([d for d in os.listdir(clusters_root) if os.path.isdir(os.path.join(clusters_root, d))])
+
+        cluster_dirs = sorted([int(d) for d in os.listdir(clusters_root) if os.path.isdir(os.path.join(clusters_root, d))])
         
         if not cluster_dirs:
             print("No cluster directories found.")
@@ -533,22 +534,22 @@ class GaussianSplattingGUI:
 
         scene = Scene(args, self.engine['scene'], self.engine['feature'], load_iteration=30000, shuffle=False, mode='eval', target='scene')
 
-        for cluster_id in cluster_dirs:
-            mask_path = os.path.join(clusters_root, cluster_id, "mask.pt")
+        for cluster_id in tqdm(cluster_dirs, desc="Rendering clusters"):
+            mask_path = os.path.join(clusters_root, str(cluster_id), "mask.pt")
             if not os.path.exists(mask_path):
                 print(f"No mask found for cluster {cluster_id}, skipping...")
                 continue
                 
-            print(f"Rendering cluster {cluster_id}...")
             mask = torch.load(mask_path)
+            gaussian_model = deepcopy(self.engine['scene'])
 
             for view in scene.getTrainCameras():
-                gaussian_model = deepcopy(self.engine['scene'])
                 gaussian_model.segment(mask)
                 res = render(view, gaussian_model, args, self.bg_color)
                 rendering = res["render"]
-                torchvision.utils.save_image(rendering, os.path.join(clusters_root, cluster_id, f'{view.uid}.png'))
-            
+                torchvision.utils.save_image(rendering, os.path.join(clusters_root, str(cluster_id), f'{view.uid}.png'))
+                gaussian_model.clear_segment()
+        
         print(f"All cluster masks rendered.")
 
 
