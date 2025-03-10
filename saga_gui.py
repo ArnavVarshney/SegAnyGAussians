@@ -345,6 +345,8 @@ class GaussianSplattingGUI:
             self.render_mode_cluster = not self.render_mode_cluster
         def callback_save_all_clusters():
             self.save_all_cluster_masks() 
+        def render_all_masks_callback():
+            self.render_all_cluster_masks()
         # control window
         with dpg.window(label="Control", tag="_control_window", width=300, height=550, pos=[self.window_width+10, 0]):
 
@@ -377,6 +379,7 @@ class GaussianSplattingGUI:
 
             dpg.add_button(label="cluster3d", callback=callback_cluster, user_data="Some Data")
             dpg.add_button(label="save_all_clusters", callback=callback_save_all_clusters, user_data="Some Data")
+            dpg.add_button(label="render_all_masks", callback=render_all_masks_callback, user_data="Some Data")
             dpg.add_button(label="reshuffle_cluster_color", callback=callback_reshuffle_color, user_data="Some Data")
             dpg.add_button(label="reload_data", callback=callback_reload, user_data="Some Data")
 
@@ -510,6 +513,43 @@ class GaussianSplattingGUI:
                 f.write(f"RGB color: {self.label_to_color[cluster_id].tolist()}\n")
         
         print(f"All {num_clusters} cluster masks saved to ./segmentation_res/clusters/")
+    
+    def render_all_cluster_masks(self):
+        from gaussian_renderer import render
+        from copy import deepcopy
+
+        clusters_root = "./segmentation_res/clusters"
+        if not os.path.exists(clusters_root):
+            print("No cluster masks found at ./segmentation_res/clusters/")
+            return
+            
+        cluster_dirs = sorted([d for d in os.listdir(clusters_root) if os.path.isdir(os.path.join(clusters_root, d))])
+        
+        if not cluster_dirs:
+            print("No cluster directories found.")
+            return
+        
+        print(f"Found {len(cluster_dirs)} cluster masks. Rendering images for each...")
+
+        scene = Scene(args, self.engine['scene'], self.engine['feature'], load_iteration=30000, shuffle=False, mode='eval', target='scene')
+
+        for cluster_id in cluster_dirs:
+            mask_path = os.path.join(clusters_root, cluster_id, "mask.pt")
+            if not os.path.exists(mask_path):
+                print(f"No mask found for cluster {cluster_id}, skipping...")
+                continue
+                
+            print(f"Rendering cluster {cluster_id}...")
+            mask = torch.load(mask_path)
+
+            for view in scene.getTrainCameras():
+                gaussian_model = deepcopy(self.engine['scene'])
+                gaussian_model.segment(mask)
+                res = render(view, gaussian_model, args, self.bg_color)
+                rendering = res["render"]
+                torchvision.utils.save_image(rendering, os.path.join(clusters_root, cluster_id, f'{view.uid}.png'))
+            
+        print(f"All cluster masks rendered.")
 
 
     def render(self):
@@ -768,12 +808,13 @@ class GaussianSplattingGUI:
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="GUI option")
+    model = ModelParams(parser, sentinel=True)
+    pipeline = PipelineParams(parser)
+    parser.add_argument('--feature_iteration', type=int, default=10000)
+    parser.add_argument('--scene_iteration', type=int, default=30000)
+    parser.add_argument('--target', default='scene', const='scene', nargs='?', choices=['scene', 'seg', 'feature', 'coarse_seg_everything', 'contrastive_feature', 'xyz'])
 
-    parser.add_argument('-m', '--model_path', type=str, default="./output/garden")
-    parser.add_argument('-f', '--feature_iteration', type=int, default=10000)
-    parser.add_argument('-s', '--scene_iteration', type=int, default=30000)
-
-    args = parser.parse_args()
+    args = get_combined_args(parser)
 
     opt = CONFIG()
 
