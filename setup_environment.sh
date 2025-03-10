@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-. $HOME/miniconda3/etc/profile.d/conda.sh
+
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    . $HOME/miniconda3/etc/profile.d/conda.sh
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    . $HOME/anaconda3/etc/profile.d/conda.sh
+else
+    echo "Neither Miniconda nor Anaconda found."
+    exit 1
+fi
 
 echo "Setting up environment"
 conda env create -f environment.yml
