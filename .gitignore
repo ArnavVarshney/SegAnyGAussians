@@ -185,9 +185,6 @@ fabric.properties
 # .idea
 output/**/*
 pytorch3d-0.7.8/**/*
-/arguments/__pycache__
-/gaussian_renderer/__pycache__
-*.pyc
-/submodules/diff-gaussian-rasterization-depth/third_party/**/*
-/submodules/diff-gaussian-rasterization-depth/third_party/glm
+**/__pycache__/
+**.pyc
 /segmentation_res
