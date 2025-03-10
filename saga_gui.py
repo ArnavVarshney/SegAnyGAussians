@@ -343,6 +343,8 @@ class GaussianSplattingGUI:
             self.render_mode_pca = not self.render_mode_pca
         def render_mode_cluster_callback(sender):
             self.render_mode_cluster = not self.render_mode_cluster
+        def callback_save_all_clusters():
+            self.save_all_cluster_masks() 
         # control window
         with dpg.window(label="Control", tag="_control_window", width=300, height=550, pos=[self.window_width+10, 0]):
 
@@ -374,6 +376,7 @@ class GaussianSplattingGUI:
             dpg.add_text("\n")
 
             dpg.add_button(label="cluster3d", callback=callback_cluster, user_data="Some Data")
+            dpg.add_button(label="save_all_clusters", callback=callback_save_all_clusters, user_data="Some Data")
             dpg.add_button(label="reshuffle_cluster_color", callback=callback_reshuffle_color, user_data="Some Data")
             dpg.add_button(label="reload_data", callback=callback_reload, user_data="Some Data")
 
@@ -473,6 +476,31 @@ class GaussianSplattingGUI:
 
         dpg.show_viewport()
 
+    def save_all_cluster_masks(self):
+        if self.seg_score is None:
+            print("No clusters have been identified yet.")
+            return
+            
+        os.makedirs("./segmentation_res/clusters", exist_ok=True)
+        
+        cluster_assignments = self.seg_score.argmax(dim=-1)
+        num_clusters = self.seg_score.shape[-1]
+        
+        print(f"Saving {num_clusters} cluster masks...")
+        
+        for cluster_id in range(num_clusters):
+            cluster_mask = (cluster_assignments == cluster_id)
+            
+            confidence = self.seg_score[:, cluster_id]
+            threshold = dpg.get_value('_ScoreThres') if dpg.does_item_exist('_ScoreThres') else 0.5
+            final_mask = cluster_mask & (confidence > threshold)
+
+            os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
+            
+            torch.save(final_mask, f"./segmentation_res/clusters/{cluster_id}/mask.pt")
+        
+        print(f"All {num_clusters} cluster masks saved to ./segmentation_res/clusters/")
+
 
     def render(self):
         while dpg.is_dearpygui_running():
@@ -538,6 +566,7 @@ class GaussianSplattingGUI:
         cluster_centers = torch.zeros(len(np.unique(cluster_labels)), normed_sampled_point_features.shape[-1])
         for i in range(0, len(np.unique(cluster_labels))):
             cluster_centers[i] = torch.nn.functional.normalize(normed_sampled_point_features[cluster_labels == i-1].mean(dim = 0), dim = -1)
+        print("Identified {} clusters".format(len(cluster_centers)))
 
         self.seg_score = torch.einsum('nc,bc->bn', cluster_centers.cpu(), normed_point_features.cpu())
         self.cluster_point_colors = self.label_to_color[self.seg_score.argmax(dim = -1).cpu().numpy()]
@@ -730,7 +759,7 @@ class GaussianSplattingGUI:
 if __name__ == "__main__":
     parser = ArgumentParser(description="GUI option")
 
-    parser.add_argument('-m', '--model_path', type=str, default="./output/figurines")
+    parser.add_argument('-m', '--model_path', type=str, default="./output/garden")
     parser.add_argument('-f', '--feature_iteration', type=int, default=10000)
     parser.add_argument('-s', '--scene_iteration', type=int, default=30000)
 
