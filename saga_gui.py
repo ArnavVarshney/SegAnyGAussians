@@ -353,7 +353,7 @@ class GaussianSplattingGUI:
             dpg.add_text("Mouse position: click anywhere to start. ", tag="pos_item")
             dpg.add_slider_float(label="Scale", default_value=1,
                                  min_value=0.0, max_value=1.0, tag="_Scale")
-            dpg.add_slider_float(label="ScoreThres", default_value=0.85,
+            dpg.add_slider_float(label="ScoreThres", default_value=0.9,
                                  min_value=0.0, max_value=1.0, tag="_ScoreThres")
             # dpg.add_button(label="render_option", tag="_button_depth",
                             # callback=callback_depth)
@@ -490,6 +490,7 @@ class GaussianSplattingGUI:
         num_clusters = self.seg_score.shape[-1]
         
         print(f"Saving {num_clusters} cluster masks...")
+        skip = 0
         
         for cluster_id in range(num_clusters):
             cluster_mask = (cluster_assignments == cluster_id)
@@ -498,8 +499,9 @@ class GaussianSplattingGUI:
             threshold = dpg.get_value('_ScoreThres') if dpg.does_item_exist('_ScoreThres') else 0.5
             final_mask = cluster_mask & (confidence > threshold)
 
-            if final_mask.sum() < 10:
+            if final_mask.sum() < 10000:
                 print(f"Skipping cluster {cluster_id} as it has too few points after thresholding")
+                skip += 1
                 continue
                 
             os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
@@ -512,7 +514,7 @@ class GaussianSplattingGUI:
                 f.write(f"Confidence threshold: {threshold}\n")
                 f.write(f"RGB color: {self.label_to_color[cluster_id].tolist()}\n")
         
-        print(f"All {num_clusters} cluster masks saved to ./segmentation_res/clusters/")
+        print(f"All {num_clusters - skip} cluster masks saved to ./segmentation_res/clusters/")
     
     def render_all_cluster_masks(self):
         from gaussian_renderer import render
