@@ -225,7 +225,13 @@ class Scene:
     def save(self, iteration, target='scene'):
         assert target != 'feature' and "Please use save_feature() to save feature gaussians!"
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-        self.gaussians.save_ply(os.path.join(point_cloud_path, target+"_point_cloud.ply"))
+        self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
+        exposure_dict = {
+            image_name: self.gaussians.get_exposure_from_name(image_name).detach().cpu().numpy().tolist()
+            for image_name in self.gaussians.exposure_mapping
+        }
+        with open(os.path.join(self.model_path, "exposure.json"), "w") as f:
+            json.dump(exposure_dict, f, indent=2)
 
     def save_mask(self, iteration, id = 0):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
