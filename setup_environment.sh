@@ -16,7 +16,7 @@ conda activate saga
 echo "Setting up environment variables"
 echo "CONDA_PREFIX: ${CONDA_PREFIX}"
 conda env config vars set CUDA_HOME=${CONDA_PREFIX}
-conda env config vars set LD_LIBRARY_PATH=${CONDA_PREFIX}/targets/x86_64-linux/include/lib
+conda env config vars set LD_LIBRARY_PATH=${CONDA_PREFIX}/targets/x86_64-linux/lib
 conda env config vars set CPATH=${CONDA_PREFIX}/targets/x86_64-linux/include
 conda deactivate
 
