@@ -4,6 +4,3 @@
 [submodule "third_party/segment-anything"]
 	path = third_party/segment-anything
 	url = git@github.com:facebookresearch/segment-anything.git
-[submodule "submodules/fused-ssim"]
-	path = submodules/fused-ssim
-	url = https://github.com/rahul-goel/fused-ssim.git
