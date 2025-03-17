@@ -12,16 +12,13 @@ import math
 
 def process_images(rank, world_size, image_paths, args):
     """Process a subset of images on a specific GPU"""
-    # Set the device for this process
     device = f'cuda:{rank}'
     torch.cuda.set_device(rank)
     
-    # Initialize SAM model on this GPU
     print(f"Process {rank}: Initializing SAM on {device}...")
     model_type = args.sam_arch
     sam = sam_model_registry[model_type](checkpoint=args.sam_checkpoint_path).to(device)
     
-    # Initialize mask generator
     mask_generator = SamAutomaticMaskGenerator(
         model=sam,
         points_per_side=32,
@@ -33,13 +30,11 @@ def process_images(rank, world_size, image_paths, args):
         min_mask_region_area=100,
     )
     
-    # Determine which images this process will handle
     start_idx = rank * len(image_paths) // world_size
     end_idx = (rank + 1) * len(image_paths) // world_size
     process_image_paths = image_paths[start_idx:end_idx]
     
-    # Process images
-    if rank == 0:  # Only the first process shows the progress bar
+    if rank == 0:  
         process_iterator = tqdm(process_image_paths, desc=f"GPU {rank} processing")
     else:
         process_iterator = process_image_paths
@@ -48,7 +43,6 @@ def process_images(rank, world_size, image_paths, args):
         name = path.split('.')[0]
         output_file = os.path.join(args.output_dir, name + '.pt')
         
-        # Skip if output already exists
         if os.path.exists(output_file) and not args.overwrite:
             continue
             
@@ -58,7 +52,6 @@ def process_images(rank, world_size, image_paths, args):
                             dsize=(img.shape[1] // args.downsample, img.shape[0] // args.downsample),
                             fx=1, fy=1, interpolation=cv2.INTER_LINEAR)
         
-        # Generate masks
         masks = mask_generator.generate(img)
         
         mask_list = []
@@ -83,9 +76,8 @@ def process_images(rank, world_size, image_paths, args):
                 
         if mask_list:
             masks = torch.stack(mask_list, dim=0)
-            torch.save(masks.cpu(), output_file)  # Save to CPU to avoid CUDA memory issues
+            torch.save(masks.cpu(), output_file) 
         else:
-            # Save empty tensor if no valid masks
             torch.save(torch.zeros((0, img.shape[0], img.shape[1]), dtype=torch.bool), output_file)
 
 if __name__ == '__main__':
@@ -101,7 +93,6 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
-    # Determine image directory
     downsample_manually = False
     if args.downsample == 1 or args.downsample_type == 'mask':
         args.image_dir = os.path.join(args.image_root, 'images')
@@ -117,18 +108,14 @@ if __name__ == '__main__':
     args.output_dir = os.path.join(args.image_root, 'sam_masks')
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Get the list of all images
     image_paths = sorted(os.listdir(args.image_dir))
     
-    # Use at most the number of available GPUs
     num_gpus = min(args.num_gpus, torch.cuda.device_count())
     print(f"Using {num_gpus} GPUs for processing {len(image_paths)} images")
     
     if num_gpus == 1:
-        # Single GPU processing
         process_images(0, 1, image_paths, args)
     else:
-        # Spawn multiple processes for multi-GPU processing
         mp.spawn(
             process_images,
             args=(num_gpus, image_paths, args),
