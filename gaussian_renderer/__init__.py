@@ -83,7 +83,6 @@ def render(
     scales = None
     rotations = None
     cov3D_precomp = None
-
     if pipe.compute_cov3D_python:
         cov3D_precomp = pc.get_covariance(scaling_modifier)
     else:
@@ -150,12 +149,16 @@ def render(
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
-    return {
+    rendered_image = rendered_image.clamp(0, 1)
+    out = {
         "render": rendered_image,
         "viewspace_points": screenspace_points,
-        "visibility_filter": radii > 0,
+        "visibility_filter": (radii > 0).nonzero(),
         "radii": radii,
+        "depth": depth_image,
     }
+
+    return out
 
 
 def render_mask(
