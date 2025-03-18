@@ -6,7 +6,7 @@ import numpy as np
 import time
 import os
 
-plt.style.use('ggplot')
+plt.style.use("ggplot")
 gpu = torch.cuda.get_device_name()
 
 if __name__ == "__main__":
@@ -16,10 +16,7 @@ if __name__ == "__main__":
     dimensions = list(range(50, 1550, 50))
     iterations = 50
 
-    data = {
-        "pytorch_mssim": [],
-        "fused-ssim": []
-    }
+    data = {"pytorch_mssim": [], "fused-ssim": []}
 
     pm_ssim = SSIM(data_range=1.0, channel=CH)
 
@@ -59,10 +56,7 @@ if __name__ == "__main__":
     plt.title(f"Training Benchmark on {gpu}.")
     plt.savefig(os.path.join("..", "images", "training_time.png"), dpi=300)
 
-    data = {
-        "pytorch_mssim": [],
-        "fused-ssim": []
-    }
+    data = {"pytorch_mssim": [], "fused-ssim": []}
 
     plt.clf()
     for d in dimensions:
@@ -85,7 +79,9 @@ if __name__ == "__main__":
 
             begin = time.time()
             for _ in range(iterations):
-                mine_ssim_val_same = fused_ssim(img1_mine_same, img2_mine_same, train=False)
+                mine_ssim_val_same = fused_ssim(
+                    img1_mine_same, img2_mine_same, train=False
+                )
             torch.cuda.synchronize()
             end = time.time()
             data["fused-ssim"].append((end - begin) / iterations * 1000)

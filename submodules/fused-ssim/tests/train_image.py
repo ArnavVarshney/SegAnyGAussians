@@ -4,7 +4,16 @@ import os
 from PIL import Image
 from fused_ssim import fused_ssim
 
-gt_image = torch.tensor(np.array(Image.open(os.path.join("..", "images", "albert.jpg"))), dtype=torch.float32, device="cuda").unsqueeze(0).unsqueeze(0) / 255.0
+gt_image = (
+    torch.tensor(
+        np.array(Image.open(os.path.join("..", "images", "albert.jpg"))),
+        dtype=torch.float32,
+        device="cuda",
+    )
+    .unsqueeze(0)
+    .unsqueeze(0)
+    / 255.0
+)
 pred_image = torch.nn.Parameter(torch.rand_like(gt_image))
 
 with torch.no_grad():
