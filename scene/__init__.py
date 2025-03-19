@@ -178,15 +178,15 @@ class Scene:
         self.test_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
-            # used for testing lerf transforms,json
-            # and not os.path.exists(os.path.join(args.source_path, "transforms.json")):
             print(
                 f"Allow Camera Principle Point Shift: {args.allow_principle_point_shift}"
             )
             scene_info = sceneLoadTypeCallbacks["Colmap"](
                 args.source_path,
                 args.images,
+                args.depths,
                 args.eval,
+                args.train_test_exp,
                 need_features=args.need_features,
                 need_masks=args.need_masks,
                 sample_rate=sample_rate,
@@ -196,11 +196,8 @@ class Scene:
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
             print("Found transforms_train.json file, assuming Blender data set!")
             scene_info = sceneLoadTypeCallbacks["Blender"](
-                args.source_path, args.white_background, args.eval
+                args.source_path, args.white_background, args.depths, args.eval
             )
-        # elif os.path.exists(os.path.join(args.source_path, "transforms.json")):
-        #     print("Found transforms.json file, assuming Lerf data set!")
-        #     scene_info = sceneLoadTypeCallbacks["Lerf"](args.source_path, args.white_background, args.eval)
         else:
             assert False, "Could not recognize scene type!"
 

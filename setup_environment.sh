@@ -22,10 +22,12 @@ conda deactivate
 
 echo "Installing pip dependencies"
 conda activate saga
-pip install -e submodules/diff-gaussian-rasterization
-pip install -e submodules/diff-gaussian-rasterization_contrastive_f
-pip install -e submodules/diff-gaussian-rasterization-depth
-pip install -e third_party/segment-anything
+for dir in submodules/*/; do
+    if [ -f "${dir}setup.py" ]; then
+        echo "Installing ${dir}"
+        pip install "${dir}"
+    fi
+done
 pip install git+https://github.com/facebookresearch/pytorch3d.git@stable
 
 echo "Installing versioned pip dependencies"

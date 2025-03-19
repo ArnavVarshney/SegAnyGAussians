@@ -83,6 +83,7 @@ def render(
     scales = None
     rotations = None
     cov3D_precomp = None
+
     if pipe.compute_cov3D_python:
         cov3D_precomp = pc.get_covariance(scaling_modifier)
     else:
