@@ -189,3 +189,4 @@ pytorch3d-0.7.8/**/*
 **.pyc
 /segmentation_res
 .DS_Store
+/third_party

@@ -67,7 +67,6 @@ def getProjectionMatrix(
     tanHalfFovY = math.tan((fovY / 2))
     tanHalfFovX = math.tan((fovX / 2))
 
-    # the origin at center of image plane
     top = tanHalfFovY * znear
     bottom = -top
     right = tanHalfFovX * znear
