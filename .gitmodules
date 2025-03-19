@@ -1,8 +1,8 @@
 [submodule "submodules/kmeans_pytorch"]
-	path = third_party/kmeans_pytorch
+	path = submodules/kmeans_pytorch
 	url = git@github.com:subhadarship/kmeans_pytorch.git
 [submodule "submodules/segment-anything"]
-	path = third_party/segment-anything
+	path = submodules/segment-anything
 	url = git@github.com:facebookresearch/segment-anything.git
 [submodule "submodules/fused-ssim"]
 	path = submodules/fused-ssim
