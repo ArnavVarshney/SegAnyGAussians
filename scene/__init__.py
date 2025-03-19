@@ -230,11 +230,19 @@ class Scene:
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
             self.train_cameras[resolution_scale] = cameraList_from_camInfos(
-                scene_info.train_cameras, resolution_scale, args
+                scene_info.train_cameras,
+                resolution_scale,
+                args,
+                scene_info.is_nerf_synthetic,
+                False,
             )
             print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(
-                scene_info.test_cameras, resolution_scale, args
+                scene_info.test_cameras,
+                resolution_scale,
+                args,
+                scene_info.is_nerf_synthetic,
+                True,
             )
 
         # Load or initialize scene / seg gaussians
@@ -428,11 +436,6 @@ class Scene:
             smooth_type,
             smooth_K,
         )
-
-    # def save_coarse_seg_everything(self, iteration):
-    #     assert self.feature_gaussians is not None
-    #     point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-    #     self.feature_gaussians.save_ply(os.path.join(point_cloud_path, "coarse_seg_everything_point_cloud.ply"))
 
     def getTrainCameras(self, scale=1.0):
         return self.train_cameras[scale]
