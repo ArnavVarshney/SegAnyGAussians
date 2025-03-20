@@ -66,7 +66,6 @@ __forceinline__ __device__ void getRect(const float2 p, int2 ext_rect, uint2& re
 	};
 }
 
-
 __forceinline__ __device__ float3 transformPoint4x3(const float3& p, const float* matrix)
 {
 	float3 transformed = {

@@ -28,14 +28,16 @@ namespace CudaRasterizer
 			float* projmatrix,
 			bool* present);
 
-		static int forward(
+		static std::tuple<int,int> forward(
 			std::function<char* (size_t)> geometryBuffer,
 			std::function<char* (size_t)> binningBuffer,
 			std::function<char* (size_t)> imageBuffer,
+			std::function<char* (size_t)> sampleBuffer,
 			const int P, int D, int M,
 			const float* background,
 			const int width, int height,
 			const float* means3D,
+			const float* dc,
 			const float* shs,
 			const float* colors_precomp,
 			const float* opacities,
@@ -55,10 +57,11 @@ namespace CudaRasterizer
 			bool debug = false);
 
 		static void backward(
-			const int P, int D, int M, int R,
+			const int P, int D, int M, int R, int B,
 			const float* background,
 			const int width, int height,
 			const float* means3D,
+			const float* dc,
 			const float* shs,
 			const float* colors_precomp,
 			const float* opacities,
@@ -74,6 +77,7 @@ namespace CudaRasterizer
 			char* geom_buffer,
 			char* binning_buffer,
 			char* image_buffer,
+			char* sample_buffer,
 			const float* dL_dpix,
 			const float* dL_invdepths,
 			float* dL_dmean2D,
@@ -83,6 +87,7 @@ namespace CudaRasterizer
 			float* dL_dinvdepth,
 			float* dL_dmean3D,
 			float* dL_dcov3D,
+			float* dL_ddc,
 			float* dL_dsh,
 			float* dL_dscale,
 			float* dL_drot,
