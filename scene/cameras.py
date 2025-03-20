@@ -67,7 +67,7 @@ class Camera(nn.Module):
             resized_image_rgb = image
         else:
             resized_image_rgb = PILtoTorch(image, resolution)
-       
+
         gt_image = resized_image_rgb[:3, ...]
         self.alpha_mask = None
         if resized_image_rgb.shape[0] == 4:
