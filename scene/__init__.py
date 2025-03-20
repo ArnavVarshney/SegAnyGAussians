@@ -286,7 +286,9 @@ class Scene:
                     )
 
         elif self.gaussians is not None:
-            self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
+            self.gaussians.create_from_pcd(
+                scene_info.point_cloud, scene_info.train_cameras, self.cameras_extent
+            )
 
         # Load or initialize feature gaussians
         if self.feature_loaded_iter and self.feature_gaussians is not None:
