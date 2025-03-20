@@ -32,3 +32,7 @@ pip install git+https://github.com/facebookresearch/pytorch3d.git@stable
 
 echo "Installing versioned pip dependencies"
 pip install joblib==1.1.0
+
+echo "Downloading pre-trained models"
+mkdir ./submodules/segment-anything/sam_ckpt
+wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -O ./submodules/segment-anything/sam_ckpt/sam_vit_h_4b8939.pth
