@@ -31,4 +31,4 @@ done
 pip install git+https://github.com/facebookresearch/pytorch3d.git@stable
 
 echo "Installing versioned pip dependencies"
-pip install joblib==1.1.0 numpy==2.0
+pip install joblib==1.1.0

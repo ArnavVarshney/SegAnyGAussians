@@ -6,7 +6,7 @@ channels:
   - nvidia
   - rapidsai
 dependencies:
-  - cuda-toolkit=12.4
+  - cuda-toolkit=12.6
   - plyfile
   - python=3.11
   - pip=25.0
@@ -15,9 +15,9 @@ dependencies:
   - matplotlib
   - rapids==25.02
   - cuda-cudart
-  - cuda-version=12.4
+  - cuda-version=12.6
   - pip:
-    - --extra-index-url https://download.pytorch.org/whl/cu124
+    - --extra-index-url https://download.pytorch.org/whl/cu126
     - torch
     - torchvision
     - torchaudio
