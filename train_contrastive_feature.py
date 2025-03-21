@@ -320,7 +320,10 @@ def training(
             .unsqueeze(0)
             .repeat([sampled_scales.shape[0], 1, 1, 1])
         )
-        feature_with_scale = feature_with_scale * gates.unsqueeze(-1).unsqueeze(-1)
+        
+        gates_expanded = gates.unsqueeze(-1).unsqueeze(-1)  # Shape: [N_sampled_scales, 32, 1, 1]
+        
+        feature_with_scale = feature_with_scale * gates_expanded  # Shape: [N_sampled_scales, C, H, W]
 
         sampled_feature_with_scale = feature_with_scale[:, :, sampled_ray]
 
