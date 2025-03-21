@@ -1,11 +1,18 @@
 #!/bin/bash
 #SBATCH -p q3090 --gres=gpu:rtx3090:2  --cpus-per-task=8  --mail-type=ALL
 
-. $HOME/anaconda3/etc/profile.d/conda.sh
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    . $HOME/miniconda3/etc/profile.d/conda.sh
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    . $HOME/anaconda3/etc/profile.d/conda.sh
+else
+    echo "Neither Miniconda nor Anaconda found."
+    exit 1
+fi
 conda activate saga
 
 echo "Training the scene model"
-CUDA_LAUNCH_BLOCKING=1 python -u train_scene.py -s ~/datasets/garden -m ./output/garden --antialiasing --optimizer_type sparse_adam
+CUDA_LAUNCH_BLOCKING=1 python -u train_scene.py -s ~/datasets/garden -m ./output/garden --optimizer_type sparse_adam
 echo "Training the segmentation model"
 CUDA_LAUNCH_BLOCKING=1 python -u extract_segment_everything_masks.py --image_root  ~/datasets/garden --sam_checkpoint_path ./submodules/segment-anything/sam_ckpt/sam_vit_h_4b8939.pth --num_gpus 2 --overwrite
 echo "Getting the scale"
