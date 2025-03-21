@@ -388,12 +388,6 @@ def render_with_depth(
     }
 
 
-from diff_gaussian_rasterization_contrastive_f import (
-    GaussianRasterizationSettings as GaussianRasterizationSettingsContrastiveF,
-)
-from diff_gaussian_rasterization_contrastive_f import (
-    GaussianRasterizer as GaussianRasterizerContrastiveF,
-)
 from scene.gaussian_model_ff import FeatureGaussianModel
 
 
@@ -431,7 +425,7 @@ def render_contrastive_feature(
     tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
 
-    raster_settings = GaussianRasterizationSettingsContrastiveF(
+    raster_settings = GaussianRasterizationSettings(
         image_height=int(viewpoint_camera.feature_height),
         image_width=int(viewpoint_camera.feature_width),
         tanfovx=tanfovx,
@@ -446,7 +440,7 @@ def render_contrastive_feature(
         debug=pipe.debug,
     )
 
-    rasterizer = GaussianRasterizerContrastiveF(raster_settings=raster_settings)
+    rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
     means3D = pc.get_xyz
     means2D = screenspace_points
