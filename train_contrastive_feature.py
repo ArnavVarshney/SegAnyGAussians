@@ -26,8 +26,6 @@ import numpy as np
 
 import torch
 from torch import nn
-import pytorch3d.ops
-
 
 import time
 
@@ -197,7 +195,13 @@ def training(
 
             sampled_scales = mask_scales[sampled_scale_index]
 
-            second_big_scale = mask_scales[mask_scales < upper_bound_scale].max()
+            # Check if the filtered tensor is empty and handle it appropriately
+            filtered_scales = mask_scales[mask_scales < upper_bound_scale]
+            if len(filtered_scales) > 0:
+                second_big_scale = filtered_scales.max()
+            else:
+                # Fallback when all scales are >= upper_bound_scale
+                second_big_scale = mask_scales.min()  # or another appropriate value
 
             ray_sample_rate = (
                 opt.ray_sample_rate
