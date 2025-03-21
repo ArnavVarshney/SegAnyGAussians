@@ -426,8 +426,8 @@ def render_contrastive_feature(
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
 
     raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.feature_height),
-        image_width=int(viewpoint_camera.feature_width),
+        image_height=int(viewpoint_camera.image_height),
+        image_width=int(viewpoint_camera.image_width),
         tanfovx=tanfovx,
         tanfovy=tanfovy,
         bg=bg_color,
@@ -438,8 +438,9 @@ def render_contrastive_feature(
         campos=viewpoint_camera.camera_center,
         prefiltered=False,
         debug=pipe.debug,
+        antialiasing=pipe.antialiasing,
     )
-
+    
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
     means3D = pc.get_xyz
