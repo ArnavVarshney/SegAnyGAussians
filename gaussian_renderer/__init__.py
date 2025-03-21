@@ -388,6 +388,12 @@ def render_with_depth(
     }
 
 
+from diff_gaussian_rasterization_contrastive_f import (
+    GaussianRasterizationSettings as GaussianRasterizationSettingsContrastiveF,
+)
+from diff_gaussian_rasterization_contrastive_f import (
+    GaussianRasterizer as GaussianRasterizerContrastiveF,
+)
 from scene.gaussian_model_ff import FeatureGaussianModel
 
 
@@ -408,7 +414,6 @@ def render_contrastive_feature(
     Background tensor (bg_color) must be on GPU!
     """
 
-    bg_color = bg_color.cuda()
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     screenspace_points = (
         torch.zeros_like(
@@ -425,9 +430,9 @@ def render_contrastive_feature(
     tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
 
-    raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),
-        image_width=int(viewpoint_camera.image_width),
+    raster_settings = GaussianRasterizationSettingsContrastiveF(
+        image_height=int(viewpoint_camera.feature_height),
+        image_width=int(viewpoint_camera.feature_width),
         tanfovx=tanfovx,
         tanfovy=tanfovy,
         bg=bg_color,
@@ -438,10 +443,9 @@ def render_contrastive_feature(
         campos=viewpoint_camera.camera_center,
         prefiltered=False,
         debug=pipe.debug,
-        antialiasing=pipe.antialiasing,
     )
-    
-    rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+
+    rasterizer = GaussianRasterizerContrastiveF(raster_settings=raster_settings)
 
     means3D = pc.get_xyz
     means2D = screenspace_points
@@ -465,15 +469,20 @@ def render_contrastive_feature(
 
     if smooth_type is None:
         colors_precomp = pc.get_point_features
-    elif smooth_type == 'multi_res':
-        colors_precomp = pc.get_multi_resolution_smoothed_point_features(smooth_weights = smooth_weights)
-    elif smooth_type == 'traditional':
-        colors_precomp = pc.get_smoothed_point_features(K = smooth_K, dropout=0.5)
-    
-    if norm_point_features:
-        colors_precomp = colors_precomp / (colors_precomp.norm(dim=1, keepdim=True) + 1e-9)
+    elif smooth_type == "multi_res":
+        colors_precomp = pc.get_multi_resolution_smoothed_point_features(
+            smooth_weights=smooth_weights
+        )
+    elif smooth_type == "traditional":
+        colors_precomp = pc.get_smoothed_point_features(K=smooth_K, dropout=0.5)
 
-    rendered_image, radii, depth_image = rasterizer(
+    if norm_point_features:
+        colors_precomp = colors_precomp / (
+            colors_precomp.norm(dim=1, keepdim=True) + 1e-9
+        )
+
+    # Rasterize visible Gaussians to image, obtain their radii (on screen).
+    rendered_image, radii = rasterizer(
         means3D=means3D,
         means2D=means2D,
         shs=shs,
@@ -486,13 +495,11 @@ def render_contrastive_feature(
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
-    rendered_image = rendered_image.clamp(0, 1)
     out = {
         "render": rendered_image,
         "viewspace_points": screenspace_points,
         "visibility_filter": (radii > 0).nonzero(),
         "radii": radii,
-        "depth": depth_image,
     }
 
     return out

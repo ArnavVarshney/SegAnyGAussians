@@ -195,13 +195,7 @@ def training(
 
             sampled_scales = mask_scales[sampled_scale_index]
 
-            # Check if the filtered tensor is empty and handle it appropriately
-            filtered_scales = mask_scales[mask_scales < upper_bound_scale]
-            if len(filtered_scales) > 0:
-                second_big_scale = filtered_scales.max()
-            else:
-                # Fallback when all scales are >= upper_bound_scale
-                second_big_scale = mask_scales.min()  # or another appropriate value
+            second_big_scale = mask_scales[mask_scales < upper_bound_scale].max()
 
             ray_sample_rate = (
                 opt.ray_sample_rate
@@ -295,6 +289,7 @@ def training(
             smooth_K=opt.smooth_K,
         )
         rendered_features = render_pkg_feat["render"]
+        print(rendered_features.shape)
 
         rendered_feature_norm = rendered_features.norm(dim=0, p=2).mean()
         rendered_feature_norm_reg = (1 - rendered_feature_norm) ** 2
@@ -320,10 +315,10 @@ def training(
             .unsqueeze(0)
             .repeat([sampled_scales.shape[0], 1, 1, 1])
         )
-        
-        gates_expanded = gates.unsqueeze(-1).unsqueeze(-1)  # Shape: [N_sampled_scales, 32, 1, 1]
-        
-        feature_with_scale = feature_with_scale * gates_expanded  # Shape: [N_sampled_scales, C, H, W]
+
+        print(feature_with_scale.shape)
+        print(gates.shape)
+        feature_with_scale = feature_with_scale * gates.unsqueeze(-1).unsqueeze(-1)
 
         sampled_feature_with_scale = feature_with_scale[:, :, sampled_ray]
 
