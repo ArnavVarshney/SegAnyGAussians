@@ -1,4 +1,5 @@
 # Borrowed from OmniSeg3D-GS (https://github.com/OceanYing/OmniSeg3D-GS)
+import time
 import torch
 from scene import Scene
 import os
@@ -834,9 +835,10 @@ class GaussianSplattingGUI:
         )
         if self.cluster_in_3D_flag:
             self.cluster_in_3D_flag = False
+            start_time = time.time()
             print("Clustering in 3D...")
             self.cluster_in_3D()
-            print("Clustering finished.")
+            print(f"Clustering finished in {time.time() - start_time:.2f}s")
         self.rendered_cluster = (
             None
             if self.cluster_point_colors is None
@@ -951,6 +953,7 @@ class GaussianSplattingGUI:
                 self.engine._rotation       # (N, 4)
                 self.engine._objects_dc     # (N, 1, 16)
                 """
+                start_time = time.time()
                 print("Segmenting in 3D")
                 self.segment3d_flag = False
                 feat_pts = self.engine["feature"].get_point_features.squeeze()
@@ -973,7 +976,7 @@ class GaussianSplattingGUI:
                 #     pass
                 self.engine["scene"].segment(self.score_pts_binary)
                 self.engine["feature"].segment(self.score_pts_binary)
-                print("Segmentation finished")
+                print(f"Segmentation finished in {time.time() - start_time:.2f}s")
 
         if self.save_flag:
             print("Saving ...")
