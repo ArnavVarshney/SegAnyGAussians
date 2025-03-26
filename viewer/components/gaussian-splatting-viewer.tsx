@@ -15,6 +15,7 @@ import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
 import FolderSelector from "./folder-selector"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function GaussianSplattingViewer() {
   const [files, setFiles] = useState({
@@ -35,7 +36,7 @@ export default function GaussianSplattingViewer() {
     refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
     refinedPly: Record<string, string>;
   } | null>(null)
-  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [useFolder, setUseFolder] = useState(false)
 
   const [viewMode, setViewMode] = useState<"gaussian" | "mesh" | "both">("both")
@@ -55,10 +56,10 @@ export default function GaussianSplattingViewer() {
 
   // Create object URLs when files are uploaded
   useEffect(() => {
-    if (files.ply) setUrls((prev) => ({ ...prev, ply: URL.createObjectURL(files.ply) }))
-    if (files.obj) setUrls((prev) => ({ ...prev, obj: URL.createObjectURL(files.obj) }))
-    if (files.mtl) setUrls((prev) => ({ ...prev, mtl: URL.createObjectURL(files.mtl) }))
-    if (files.texture) setUrls((prev) => ({ ...prev, texture: URL.createObjectURL(files.texture) }))
+    if (files.ply) setUrls((prev) => ({ ...prev, ply: URL.createObjectURL(files.ply!) }))
+    if (files.obj) setUrls((prev) => ({ ...prev, obj: URL.createObjectURL(files.obj!) }))
+    if (files.mtl) setUrls((prev) => ({ ...prev, mtl: URL.createObjectURL(files.mtl!) }))
+    if (files.texture) setUrls((prev) => ({ ...prev, texture: URL.createObjectURL(files.texture!) }))
 
     // Clean up URLs on unmount
     return () => {
@@ -87,22 +88,13 @@ export default function GaussianSplattingViewer() {
     refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
     refinedPly: Record<string, string>;
   }) => {
-    setFolderData(data)
-    const modelNames = Object.keys(data.refinedPly)
+    setFolderData(data);
+    const modelNames = Object.keys(data.refinedPly);
     if (modelNames.length > 0) {
-      setSelectedModel(modelNames[0])
-      setUseFolder(true)
+      setSelectedModels([modelNames[0]]);
+      setUseFolder(true);
     }
   }
-
-  const activeUrls = useFolder && selectedModel && folderData
-    ? {
-      ply: folderData.refinedPly[selectedModel] || "",
-      obj: folderData.refinedMesh[selectedModel]?.obj || "",
-      mtl: folderData.refinedMesh[selectedModel]?.mtl || "",
-      texture: folderData.refinedMesh[selectedModel]?.png || "",
-    }
-    : urls
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
@@ -129,27 +121,46 @@ export default function GaussianSplattingViewer() {
                 <FolderSelector onFolderSelected={handleFolderSelected} />
                 {folderData && Object.keys(folderData.refinedPly).length > 0 && (
                   <div className="mt-4">
-                    <Label htmlFor="model-select" className="mb-2 block">
-                      Select Model:
+                    <Label className="mb-2 block">
+                      Select Models:
                     </Label>
-                    <Select
-                      value={selectedModel || ""}
-                      onValueChange={(value) => {
-                        setSelectedModel(value)
-                        setUseFolder(true)
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(folderData.refinedPly).map((modelName) => (
-                          <SelectItem key={modelName} value={modelName}>
+                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
+                      {Object.keys(folderData.refinedPly).map((modelName) => (
+                        <div key={modelName} className="flex items-center space-x-2 py-1">
+                          <Checkbox
+                            id={`model-${modelName}`}
+                            checked={selectedModels.includes(modelName)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedModels(prev => [...prev, modelName]);
+                              } else {
+                                setSelectedModels(prev => prev.filter(m => m !== modelName));
+                              }
+                              setUseFolder(true);
+                            }}
+                          />
+                          <Label htmlFor={`model-${modelName}`} className="cursor-pointer">
                             {modelName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex justify-between">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedModels([])}
+                      >
+                        Clear All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedModels(Object.keys(folderData.refinedPly))}
+                      >
+                        Select All
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -335,15 +346,40 @@ export default function GaussianSplattingViewer() {
               ambientColor={lighting.ambientColor}
             />
 
-            {(viewMode === "gaussian" || viewMode === "both") && activeUrls.ply && (
-              <GaussianSplatting url={activeUrls.ply} pointSize={pointSize} />
+            {(viewMode === "gaussian" || viewMode === "both") && useFolder && folderData &&
+              selectedModels.map((modelName, index) => (
+                <GaussianSplatting
+                  key={`gaussian-${modelName}`}
+                  url={folderData.refinedPly[modelName]}
+                  pointSize={pointSize}
+                />
+              ))
+            }
+
+            {(viewMode === "gaussian" || viewMode === "both") && !useFolder && urls.ply && (
+              <GaussianSplatting url={urls.ply} pointSize={pointSize} />
             )}
 
-            {(viewMode === "mesh" || viewMode === "both") && activeUrls.obj && (
+            {(viewMode === "mesh" || viewMode === "both") && useFolder && folderData &&
+              selectedModels.map((modelName, index) => (
+                folderData.refinedMesh[modelName] && (
+                  <MeshModel
+                    key={`mesh-${modelName}`}
+                    objUrl={folderData.refinedMesh[modelName].obj}
+                    mtlUrl={folderData.refinedMesh[modelName].mtl}
+                    textureUrl={folderData.refinedMesh[modelName].png}
+                    position={[0, 0, 0]}
+                    doubleSided={true}
+                  />
+                )
+              ))
+            }
+
+            {(viewMode === "mesh" || viewMode === "both") && !useFolder && urls.obj && (
               <MeshModel
-                objUrl={activeUrls.obj}
-                mtlUrl={activeUrls.mtl}
-                textureUrl={activeUrls.texture}
+                objUrl={urls.obj}
+                mtlUrl={urls.mtl}
+                textureUrl={urls.texture}
                 position={[0, 0, 0]}
                 doubleSided={true}
               />
