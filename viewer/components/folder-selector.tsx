@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Folder } from "lucide-react";
 
 interface FolderSelectorProps {
   onFolderSelected: (folderStructure: {
@@ -13,51 +15,55 @@ export default function FolderSelector({ onFolderSelected }: FolderSelectorProps
   const handleFolderSelect = async () => {
     try {
       setIsLoading(true);
-      
-      // Create a file input element programmatically
-      const input = document.createElement('input');
-      input.type = 'file';
+      const input = document.createElement("input");
+      input.type = "file";
       input.webkitdirectory = true; // Non-standard but widely supported
-    //   input.directory = true; // Non-standard
-      
+
+      input.oncancel = () => {
+        setIsLoading(false);
+      };
+
       input.onchange = (e) => {
         const files = Array.from(input.files || []);
         const refinedMesh: Record<string, { obj: string; mtl: string; png: string }> = {};
         const refinedPly: Record<string, string> = {};
-        
-        // Process the files
-        files.forEach(file => {
-          const path = file.webkitRelativePath || '';
-          const pathParts = path.split('/');
-          
-          if (pathParts.length >= 3) {
-            const mainFolder = pathParts[0];
-            const objectType = pathParts[1];
-            const objectName = pathParts[2];
-            
-            if (mainFolder === 'refined_mesh') {
-              if (!refinedMesh[objectName]) {
-                refinedMesh[objectName] = { obj: '', mtl: '', png: '' };
-              }
-              
-              const extension = file.name.split('.').pop()?.toLowerCase();
-              if (extension === 'obj') {
-                refinedMesh[objectName].obj = URL.createObjectURL(file);
-              } else if (extension === 'mtl') {
-                refinedMesh[objectName].mtl = URL.createObjectURL(file);
-              } else if (extension === 'png') {
-                refinedMesh[objectName].png = URL.createObjectURL(file);
-              }
-            } else if (mainFolder === 'refined_ply' && file.name.endsWith('.ply')) {
-              refinedPly[objectName] = URL.createObjectURL(file);
+
+        files.forEach((file) => {
+          const path = file.webkitRelativePath || "";
+          const pathParts = path.split("/");
+
+          const mainFolder = pathParts[1];
+          const objectType = pathParts[2];
+          const fileName = pathParts[3];
+
+          if (mainFolder === "refined_mesh") {
+            if (!refinedMesh[objectType]) {
+              refinedMesh[objectType] = { obj: "", mtl: "", png: "" };
             }
+
+            const extension = file.name.split(".").pop()?.toLowerCase();
+            if (extension === "obj") {
+              refinedMesh[objectType].obj = URL.createObjectURL(file);
+            } else if (extension === "mtl") {
+              refinedMesh[objectType].mtl = URL.createObjectURL(file);
+            } else if (extension === "png") {
+              refinedMesh[objectType].png = URL.createObjectURL(file);
+            }
+          } else if (mainFolder === "refined_ply" && fileName.endsWith(".ply")) {
+            refinedPly[objectType] = URL.createObjectURL(file);
           }
         });
-        
+
+        if (Object.keys(refinedMesh).length === 0 || Object.keys(refinedPly).length === 0) {
+          setIsLoading(false);
+          alert("Please select a folder with refined mesh and ply files.");
+          return;
+        }
+
         onFolderSelected({ refinedMesh, refinedPly });
         setIsLoading(false);
       };
-      
+
       input.click();
     } catch (error) {
       console.error("Error selecting folder:", error);
@@ -66,17 +72,16 @@ export default function FolderSelector({ onFolderSelected }: FolderSelectorProps
   };
 
   return (
-    <div className="mb-6 w-full max-w-xl">
-      <button
+    <div className="flex items-center gap-2">
+      <Button
         onClick={handleFolderSelect}
         disabled={isLoading}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        variant="secondary"
+        className="flex-1 flex items-center gap-2"
       >
+        <Folder className="h-4 w-4" />
         {isLoading ? "Processing..." : "Select Models Folder"}
-      </button>
-      <p className="mt-2 text-sm text-gray-500">
-        Select a folder containing refined_mesh and refined_ply subdirectories
-      </p>
+      </Button>
     </div>
   );
 }

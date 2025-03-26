@@ -13,6 +13,8 @@ import FileUploader from "./file-uploader"
 import GaussianSplatting from "./gaussian-splatting"
 import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
+import FolderSelector from "./folder-selector"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function GaussianSplattingViewer() {
   const [files, setFiles] = useState({
@@ -28,6 +30,13 @@ export default function GaussianSplattingViewer() {
     mtl: "",
     texture: "",
   })
+
+  const [folderData, setFolderData] = useState<{
+    refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
+    refinedPly: Record<string, string>;
+  } | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [useFolder, setUseFolder] = useState(false)
 
   const [viewMode, setViewMode] = useState<"gaussian" | "mesh" | "both">("both")
   const [pointSize, setPointSize] = useState(0.01)
@@ -71,7 +80,29 @@ export default function GaussianSplattingViewer() {
 
   const handleFileUpload = (type: keyof typeof files, file: File) => {
     setFiles((prev) => ({ ...prev, [type]: file }))
+    setUseFolder(false)
   }
+
+  const handleFolderSelected = (data: {
+    refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
+    refinedPly: Record<string, string>;
+  }) => {
+    setFolderData(data)
+    const modelNames = Object.keys(data.refinedPly)
+    if (modelNames.length > 0) {
+      setSelectedModel(modelNames[0])
+      setUseFolder(true)
+    }
+  }
+
+  const activeUrls = useFolder && selectedModel && folderData
+    ? {
+      ply: folderData.refinedPly[selectedModel] || "",
+      obj: folderData.refinedMesh[selectedModel]?.obj || "",
+      mtl: folderData.refinedMesh[selectedModel]?.mtl || "",
+      texture: folderData.refinedMesh[selectedModel]?.png || "",
+    }
+    : urls
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
@@ -86,47 +117,80 @@ export default function GaussianSplattingViewer() {
       <div className="flex flex-1 relative">
         {/* Collapsible Sidebar */}
         <div
-          className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${
-            sidebarOpen ? "w-80" : "w-0 overflow-hidden"
-          }`}
+          className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${sidebarOpen ? "w-80" : "w-0 overflow-hidden"
+            }`}
         >
-          <div className="p-4 border-b">
-            <h1 className="text-xl font-bold mb-4">Gaussian Splatting & Mesh Viewer</h1>
+          <div className="p-4 border-b overflow-y-auto h-full">
+            <h1 className="text-xl font-bold mb-4">3DGS & Mesh Viewer</h1>
 
             <div className="space-y-4 mb-4">
               <div>
-                <h2 className="text-md font-semibold mb-2">Gaussian Splatting</h2>
-                <FileUploader
-                  accept=".ply"
-                  label="Upload PLY file"
-                  onFileSelected={(file) => handleFileUpload("ply", file)}
-                  fileName={files.ply?.name}
-                />
+                <h2 className="text-md font-semibold mb-2">Folder Selection</h2>
+                <FolderSelector onFolderSelected={handleFolderSelected} />
+                {folderData && Object.keys(folderData.refinedPly).length > 0 && (
+                  <div className="mt-4">
+                    <Label htmlFor="model-select" className="mb-2 block">
+                      Select Model:
+                    </Label>
+                    <Select
+                      value={selectedModel || ""}
+                      onValueChange={(value) => {
+                        setSelectedModel(value)
+                        setUseFolder(true)
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(folderData.refinedPly).map((modelName) => (
+                          <SelectItem key={modelName} value={modelName}>
+                            {modelName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <h2 className="text-md font-semibold mb-2">Mesh Model</h2>
-                <div className="grid grid-cols-1 gap-2">
-                  <FileUploader
-                    accept=".obj"
-                    label="Upload OBJ file"
-                    onFileSelected={(file) => handleFileUpload("obj", file)}
-                    fileName={files.obj?.name}
-                  />
-                  <FileUploader
-                    accept=".mtl"
-                    label="Upload MTL file"
-                    onFileSelected={(file) => handleFileUpload("mtl", file)}
-                    fileName={files.mtl?.name}
-                  />
-                  <FileUploader
-                    accept=".png,.jpg,.jpeg"
-                    label="Upload texture"
-                    onFileSelected={(file) => handleFileUpload("texture", file)}
-                    fileName={files.texture?.name}
-                  />
+              {!useFolder &&
+                <div>
+                  <div>
+                    <h2 className="text-md font-semibold mb-2">Gaussian Splatting</h2>
+                    <FileUploader
+                      accept=".ply"
+                      label="Upload PLY file"
+                      onFileSelected={(file) => handleFileUpload("ply", file)}
+                      fileName={files.ply?.name}
+                    />
+                  </div>
+
+                  <div>
+                    <h2 className="text-md font-semibold mb-2">Mesh Model</h2>
+                    <div className="grid grid-cols-1 gap-2">
+                      <FileUploader
+                        accept=".obj"
+                        label="Upload OBJ file"
+                        onFileSelected={(file) => handleFileUpload("obj", file)}
+                        fileName={files.obj?.name}
+                      />
+                      <FileUploader
+                        accept=".mtl"
+                        label="Upload MTL file"
+                        onFileSelected={(file) => handleFileUpload("mtl", file)}
+                        fileName={files.mtl?.name}
+                      />
+                      <FileUploader
+                        accept=".png,.jpg,.jpeg"
+                        label="Upload texture"
+                        onFileSelected={(file) => handleFileUpload("texture", file)}
+                        fileName={files.texture?.name}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              }
             </div>
 
             <div className="space-y-4">
@@ -147,27 +211,20 @@ export default function GaussianSplattingViewer() {
                 </Tabs>
               </div>
 
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Label htmlFor="point-size" className="w-24">
-                    Point Size:
-                  </Label>
-                  <Slider
-                    id="point-size"
-                    min={0.001}
-                    max={0.05}
-                    step={0.001}
-                    value={[pointSize]}
-                    onValueChange={(value) => setPointSize(value[0])}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-right">{pointSize.toFixed(3)}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Switch id="show-stats" checked={showStats} onCheckedChange={setShowStats} />
-                  <Label htmlFor="show-stats">Show Stats</Label>
-                </div>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="point-size" className="w-24">
+                  Point Size:
+                </Label>
+                <Slider
+                  id="point-size"
+                  min={0.001}
+                  max={0.05}
+                  step={0.001}
+                  value={[pointSize]}
+                  onValueChange={(value) => setPointSize(value[0])}
+                  className="flex-1"
+                />
+                <span className="w-12 text-right">{pointSize.toFixed(3)}</span>
               </div>
 
               <div>
@@ -232,6 +289,11 @@ export default function GaussianSplattingViewer() {
                   </div>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2">
+                <Switch id="show-stats" checked={showStats} onCheckedChange={setShowStats} />
+                <Label htmlFor="show-stats">Show Stats</Label>
+              </div>
             </div>
           </div>
         </div>
@@ -273,15 +335,15 @@ export default function GaussianSplattingViewer() {
               ambientColor={lighting.ambientColor}
             />
 
-            {(viewMode === "gaussian" || viewMode === "both") && urls.ply && (
-              <GaussianSplatting url={urls.ply} pointSize={pointSize} />
+            {(viewMode === "gaussian" || viewMode === "both") && activeUrls.ply && (
+              <GaussianSplatting url={activeUrls.ply} pointSize={pointSize} />
             )}
 
-            {(viewMode === "mesh" || viewMode === "both") && urls.obj && (
+            {(viewMode === "mesh" || viewMode === "both") && activeUrls.obj && (
               <MeshModel
-                objUrl={urls.obj}
-                mtlUrl={urls.mtl}
-                textureUrl={urls.texture}
+                objUrl={activeUrls.obj}
+                mtlUrl={activeUrls.mtl}
+                textureUrl={activeUrls.texture}
                 position={[0, 0, 0]}
                 doubleSided={true}
               />
