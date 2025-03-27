@@ -7,9 +7,14 @@ import * as THREE from "three"
 interface GaussianSplattingProps {
   url: string
   pointSize: number
+  autoCenter?: boolean // New optional prop
 }
 
-export default function GaussianSplatting({ url, pointSize }: GaussianSplattingProps) {
+export default function GaussianSplatting({
+  url,
+  pointSize,
+  autoCenter = false // Default to false to keep objects at their original positions
+}: GaussianSplattingProps) {
   const { scene } = useThree()
   const pointsRef = useRef<THREE.Points | null>(null)
 
@@ -39,6 +44,7 @@ export default function GaussianSplatting({ url, pointSize }: GaussianSplattingP
         transparent: true,
         // This makes the points more visible from all angles
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
       })
 
       // Create points
@@ -46,17 +52,20 @@ export default function GaussianSplatting({ url, pointSize }: GaussianSplattingP
       scene.add(points)
       pointsRef.current = points
 
-      // Center the model
-      const box = new THREE.Box3().setFromObject(points)
-      const center = box.getCenter(new THREE.Vector3())
-      points.position.sub(center)
+      // Only center and scale if autoCenter is true
+      if (autoCenter) {
+        // Center the model
+        const box = new THREE.Box3().setFromObject(points)
+        const center = box.getCenter(new THREE.Vector3())
+        points.position.sub(center)
 
-      // Scale the model to fit in view
-      const size = box.getSize(new THREE.Vector3())
-      const maxDim = Math.max(size.x, size.y, size.z)
-      if (maxDim > 2) {
-        const scale = 2 / maxDim
-        points.scale.set(scale, scale, scale)
+        // Scale the model to fit in view
+        const size = box.getSize(new THREE.Vector3())
+        const maxDim = Math.max(size.x, size.y, size.z)
+        if (maxDim > 2) {
+          const scale = 2 / maxDim
+          points.scale.set(scale, scale, scale)
+        }
       }
     })
 
@@ -86,6 +95,12 @@ export default function GaussianSplatting({ url, pointSize }: GaussianSplattingP
 
 // PLY Loader implementation
 class PLYLoader {
+  sigmoid(x: number): number {
+    // Convert SH coefficients to RGB
+    // This is a simple sigmoid-like function that maps from [-1,1] to [0,1]
+    return 0.5 + 0.5 * x;
+  }
+
   load(url: string, onLoad: (geometry: THREE.BufferGeometry) => void) {
     const xhr = new XMLHttpRequest()
     xhr.open("GET", url, true)
@@ -266,14 +281,12 @@ class PLYLoader {
       // Color - try different possible naming conventions
       if (hasFeaturesDC) {
         // Using SH coefficients for color (Gaussian Splatting)
-        const r = vertex["f_dc_0"] || 0
-        const g = vertex["f_dc_1"] || 0
-        const b = vertex["f_dc_2"] || 0
+        // Apply proper sigmoid-like conversion to get proper colors
+        const r = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_0"] || 0)), 1);
+        const g = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_1"] || 0)), 1);
+        const b = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_2"] || 0)), 1);
 
-        // Convert to RGB (0-1)
-        colors.push(r + 0.5)
-        colors.push(g + 0.5)
-        colors.push(b + 0.5)
+        colors.push(r, g, b);
       } else if (vertex["red"] !== undefined) {
         // Standard color format
         const r = vertex["red"] / 255
@@ -395,26 +408,23 @@ class PLYLoader {
       // Color handling
       if (hasFeaturesDC) {
         // Using SH coefficients for color (Gaussian Splatting)
-        const r = vertex["f_dc_0"] || 0
-        const g = vertex["f_dc_1"] || 0
-        const b = vertex["f_dc_2"] || 0
+        const r = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_0"] || 0)), 1);
+        const g = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_1"] || 0)), 1);
+        const b = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_2"] || 0)), 1);
 
-        // Convert to RGB (0-1)
-        colors.push(r + 0.5)
-        colors.push(g + 0.5)
-        colors.push(b + 0.5)
+        colors.push(r, g, b);
       } else if (vertex["red"] !== undefined) {
         // Standard color format
-        const r = vertex["red"] / 255
-        const g = vertex["green"] / 255
-        const b = vertex["blue"] / 255
-        colors.push(r, g, b)
+        const r = vertex["red"] / 255;
+        const g = vertex["green"] / 255;
+        const b = vertex["blue"] / 255;
+        colors.push(r, g, b);
       } else if (vertex["r"] !== undefined) {
         // Alternative color naming
-        const r = vertex["r"] / 255
-        const g = vertex["g"] / 255
-        const b = vertex["b"] / 255
-        colors.push(r, g, b)
+        const r = vertex["r"] / 255;
+        const g = vertex["g"] / 255;
+        const b = vertex["b"] / 255;
+        colors.push(r, g, b);
       }
 
       // Opacity (for Gaussian splatting)
