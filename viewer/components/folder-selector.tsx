@@ -32,6 +32,10 @@ export default function FolderSelector({ onFolderSelected }: FolderSelectorProps
           const path = file.webkitRelativePath || "";
           const pathParts = path.split("/");
 
+          if (pathParts.length < 4) {
+            return;
+          }
+
           const mainFolder = pathParts[1];
           const objectType = pathParts[2];
           const fileName = pathParts[3];
