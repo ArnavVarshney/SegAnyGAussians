@@ -154,18 +154,25 @@ class PLYLoader {
       return geometry
     }
 
-    // Parse header to get vertex count and properties
+    // Parse header to get vertex count and property information
     const header = new TextDecoder().decode(new Uint8Array(dataView.buffer, 0, headerLength))
     const headerLines = header.split("\n")
 
     let vertexCount = 0
-    const properties: string[] = []
+    const properties: Array<{ name: string, type: string }> = []
+    let format = "binary_little_endian"
 
     for (const line of headerLines) {
       if (line.startsWith("element vertex")) {
         vertexCount = Number.parseInt(line.split(" ")[2])
       } else if (line.startsWith("property")) {
-        properties.push(line.split(" ")[2])
+        const parts = line.split(" ")
+        properties.push({
+          type: parts[1],
+          name: parts[2]
+        })
+      } else if (line.startsWith("format")) {
+        format = line.split(" ")[1]
       }
     }
 
@@ -174,35 +181,131 @@ class PLYLoader {
       return geometry
     }
 
-    // Create arrays for vertex data
+    // Prepare arrays for vertex data
     const positions: number[] = []
     const colors: number[] = []
+    const opacities: number[] = []
+    const scales: number[] = []
+    const rotations: number[] = []
 
+    // For SH coefficients
+    const hasFeaturesDC = properties.some(p => p.name.startsWith("f_dc_"))
+    const hasShFeatures = properties.some(p => p.name.startsWith("f_rest_"))
+
+    const littleEndian = format !== "binary_big_endian"
     let offset = headerLength
+
+    // Helper to read data based on type
+    const readData = (type: string): number => {
+      let value: number
+
+      switch (type) {
+        case "float":
+        case "float32":
+          value = dataView.getFloat32(offset, littleEndian)
+          offset += 4
+          break
+        case "double":
+        case "float64":
+          value = dataView.getFloat64(offset, littleEndian)
+          offset += 8
+          break
+        case "int":
+        case "int32":
+          value = dataView.getInt32(offset, littleEndian)
+          offset += 4
+          break
+        case "uint":
+        case "uint32":
+          value = dataView.getUint32(offset, littleEndian)
+          offset += 4
+          break
+        case "short":
+        case "int16":
+          value = dataView.getInt16(offset, littleEndian)
+          offset += 2
+          break
+        case "ushort":
+        case "uint16":
+          value = dataView.getUint16(offset, littleEndian)
+          offset += 2
+          break
+        case "uchar":
+        case "uint8":
+          value = dataView.getUint8(offset)
+          offset += 1
+          break
+        case "char":
+        case "int8":
+          value = dataView.getInt8(offset)
+          offset += 1
+          break
+        default:
+          console.warn(`PLYLoader: Unsupported data type: ${type}`)
+          value = 0
+          offset += 4 // Assume float32
+      }
+
+      return value
+    }
 
     // Read vertex data
     for (let i = 0; i < vertexCount; i++) {
-      // Read position (x, y, z)
-      positions.push(dataView.getFloat32(offset, true))
-      offset += 4
-      positions.push(dataView.getFloat32(offset, true))
-      offset += 4
-      positions.push(dataView.getFloat32(offset, true))
-      offset += 4
+      const vertex: Record<string, number> = {}
 
-      // Read color (r, g, b)
-      if (properties.includes("red") && properties.includes("green") && properties.includes("blue")) {
-        colors.push(dataView.getUint8(offset) / 255)
-        offset += 1
-        colors.push(dataView.getUint8(offset) / 255)
-        offset += 1
-        colors.push(dataView.getUint8(offset) / 255)
-        offset += 1
+      // Read all properties for this vertex
+      for (const prop of properties) {
+        vertex[prop.name] = readData(prop.type)
       }
 
-      // Skip other properties
-      for (let j = 6; j < properties.length; j++) {
-        offset += 4 // Assuming float32 for other properties
+      // Position (required)
+      positions.push(vertex["x"] || 0)
+      positions.push(vertex["y"] || 0)
+      positions.push(vertex["z"] || 0)
+
+      // Color - try different possible naming conventions
+      if (hasFeaturesDC) {
+        // Using SH coefficients for color (Gaussian Splatting)
+        const r = vertex["f_dc_0"] || 0
+        const g = vertex["f_dc_1"] || 0
+        const b = vertex["f_dc_2"] || 0
+
+        // Convert to RGB (0-1)
+        colors.push(r + 0.5)
+        colors.push(g + 0.5)
+        colors.push(b + 0.5)
+      } else if (vertex["red"] !== undefined) {
+        // Standard color format
+        const r = vertex["red"] / 255
+        const g = vertex["green"] / 255
+        const b = vertex["blue"] / 255
+        colors.push(r, g, b)
+      } else if (vertex["r"] !== undefined) {
+        // Alternative color naming
+        const r = vertex["r"] / 255
+        const g = vertex["g"] / 255
+        const b = vertex["b"] / 255
+        colors.push(r, g, b)
+      }
+
+      // Opacity (for Gaussian splatting)
+      if (vertex["opacity"] !== undefined) {
+        opacities.push(vertex["opacity"])
+      }
+
+      // Scale (for Gaussian splatting)
+      if (vertex["scale_0"] !== undefined) {
+        scales.push(vertex["scale_0"], vertex["scale_1"] || 0, vertex["scale_2"] || 0)
+      }
+
+      // Rotation (for Gaussian splatting)
+      if (vertex["rot_0"] !== undefined) {
+        rotations.push(
+          vertex["rot_0"] || 0,
+          vertex["rot_1"] || 0,
+          vertex["rot_2"] || 0,
+          vertex["rot_3"] || 0
+        )
       }
     }
 
@@ -211,6 +314,19 @@ class PLYLoader {
 
     if (colors.length > 0) {
       geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+    }
+
+    // Add custom attributes for Gaussian Splatting if present
+    if (opacities.length > 0) {
+      geometry.setAttribute("opacity", new THREE.Float32BufferAttribute(opacities, 1))
+    }
+
+    if (scales.length > 0) {
+      geometry.setAttribute("scale", new THREE.Float32BufferAttribute(scales, 3))
+    }
+
+    if (rotations.length > 0) {
+      geometry.setAttribute("rotation", new THREE.Float32BufferAttribute(rotations, 4))
     }
 
     return geometry
@@ -220,7 +336,7 @@ class PLYLoader {
     const lines = data.split("\n")
     let vertexCount = 0
     let vertexStartIndex = 0
-    const hasColors = false
+    const properties: Array<{ name: string, type: string }> = []
 
     // Parse header
     for (let i = 0; i < lines.length; i++) {
@@ -228,14 +344,15 @@ class PLYLoader {
 
       if (line.startsWith("element vertex")) {
         vertexCount = Number.parseInt(line.split(" ")[2])
+      } else if (line.startsWith("property")) {
+        const parts = line.split(" ")
+        properties.push({
+          type: parts[1],
+          name: parts[2]
+        })
       } else if (line === "end_header") {
         vertexStartIndex = i + 1
         break
-      } else if (
-        line.includes("property") &&
-        (line.includes("red") || line.includes("r") || line.includes("diffuse_red"))
-      ) {
-        // hasColors = true
       }
     }
 
@@ -244,23 +361,80 @@ class PLYLoader {
       return geometry
     }
 
-    // Parse vertices
+    // Check if this is a Gaussian Splatting file
+    const hasFeaturesDC = properties.some(p => p.name.startsWith("f_dc_"))
+    const hasShFeatures = properties.some(p => p.name.startsWith("f_rest_"))
+
+    // Prepare arrays for vertex data
     const positions: number[] = []
     const colors: number[] = []
+    const opacities: number[] = []
+    const scales: number[] = []
+    const rotations: number[] = []
 
+    // Parse vertices
     for (let i = 0; i < vertexCount; i++) {
-      const vertex = lines[vertexStartIndex + i].trim().split(/\s+/)
+      const line = lines[vertexStartIndex + i].trim()
+      if (!line) continue
 
-      // Position
-      positions.push(Number.parseFloat(vertex[0]))
-      positions.push(Number.parseFloat(vertex[1]))
-      positions.push(Number.parseFloat(vertex[2]))
+      const values = line.split(/\s+/)
+      const vertex: Record<string, number> = {}
 
-      // Color (if available)
-      if (vertex.length >= 6) {
-        colors.push(Number.parseInt(vertex[3]) / 255)
-        colors.push(Number.parseInt(vertex[4]) / 255)
-        colors.push(Number.parseInt(vertex[5]) / 255)
+      // Map values to properties
+      for (let j = 0; j < properties.length; j++) {
+        if (j < values.length) {
+          vertex[properties[j].name] = Number.parseFloat(values[j])
+        }
+      }
+
+      // Position (required)
+      positions.push(vertex["x"] || 0)
+      positions.push(vertex["y"] || 0)
+      positions.push(vertex["z"] || 0)
+
+      // Color handling
+      if (hasFeaturesDC) {
+        // Using SH coefficients for color (Gaussian Splatting)
+        const r = vertex["f_dc_0"] || 0
+        const g = vertex["f_dc_1"] || 0
+        const b = vertex["f_dc_2"] || 0
+
+        // Convert to RGB (0-1)
+        colors.push(r + 0.5)
+        colors.push(g + 0.5)
+        colors.push(b + 0.5)
+      } else if (vertex["red"] !== undefined) {
+        // Standard color format
+        const r = vertex["red"] / 255
+        const g = vertex["green"] / 255
+        const b = vertex["blue"] / 255
+        colors.push(r, g, b)
+      } else if (vertex["r"] !== undefined) {
+        // Alternative color naming
+        const r = vertex["r"] / 255
+        const g = vertex["g"] / 255
+        const b = vertex["b"] / 255
+        colors.push(r, g, b)
+      }
+
+      // Opacity (for Gaussian splatting)
+      if (vertex["opacity"] !== undefined) {
+        opacities.push(vertex["opacity"])
+      }
+
+      // Scale (for Gaussian splatting)
+      if (vertex["scale_0"] !== undefined) {
+        scales.push(vertex["scale_0"], vertex["scale_1"] || 0, vertex["scale_2"] || 0)
+      }
+
+      // Rotation (for Gaussian splatting)
+      if (vertex["rot_0"] !== undefined) {
+        rotations.push(
+          vertex["rot_0"] || 0,
+          vertex["rot_1"] || 0,
+          vertex["rot_2"] || 0,
+          vertex["rot_3"] || 0
+        )
       }
     }
 
@@ -269,6 +443,19 @@ class PLYLoader {
 
     if (colors.length > 0) {
       geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+    }
+
+    // Add custom attributes for Gaussian Splatting if present
+    if (opacities.length > 0) {
+      geometry.setAttribute("opacity", new THREE.Float32BufferAttribute(opacities, 1))
+    }
+
+    if (scales.length > 0) {
+      geometry.setAttribute("scale", new THREE.Float32BufferAttribute(scales, 3))
+    }
+
+    if (rotations.length > 0) {
+      geometry.setAttribute("rotation", new THREE.Float32BufferAttribute(rotations, 4))
     }
 
     return geometry
