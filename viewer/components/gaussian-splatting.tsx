@@ -44,7 +44,7 @@ export default function GaussianSplatting({
         transparent: true,
         // This makes the points more visible from all angles
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       })
 
       // Create points
@@ -96,9 +96,8 @@ export default function GaussianSplatting({
 // PLY Loader implementation
 class PLYLoader {
   sigmoid(x: number): number {
-    // Convert SH coefficients to RGB
-    // This is a simple sigmoid-like function that maps from [-1,1] to [0,1]
-    return 0.5 + 0.5 * x;
+    const C0 = 0.28209479177387814;
+    return 0.5 + C0 * x;
   }
 
   load(url: string, onLoad: (geometry: THREE.BufferGeometry) => void) {
@@ -126,11 +125,7 @@ class PLYLoader {
     const header = textDecoder.decode(new Uint8Array(data, 0, 100))
     const isBinary = header.indexOf("format binary") !== -1
 
-    if (isBinary) {
-      return this.parseBinary(dataView, geometry)
-    } else {
-      return this.parseASCII(textDecoder.decode(data), geometry)
-    }
+    return this.parseBinary(dataView, geometry)
   }
 
   parseBinary(dataView: DataView, geometry: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -282,9 +277,9 @@ class PLYLoader {
       if (hasFeaturesDC) {
         // Using SH coefficients for color (Gaussian Splatting)
         // Apply proper sigmoid-like conversion to get proper colors
-        const r = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_0"] || 0)), 1);
-        const g = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_1"] || 0)), 1);
-        const b = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_2"] || 0)), 1);
+        let r = this.sigmoid(vertex["f_dc_0"] || 0);
+        let g = this.sigmoid(vertex["f_dc_1"] || 0);
+        let b = this.sigmoid(vertex["f_dc_2"] || 0);
 
         colors.push(r, g, b);
       } else if (vertex["red"] !== undefined) {
@@ -299,132 +294,6 @@ class PLYLoader {
         const g = vertex["g"] / 255
         const b = vertex["b"] / 255
         colors.push(r, g, b)
-      }
-
-      // Opacity (for Gaussian splatting)
-      if (vertex["opacity"] !== undefined) {
-        opacities.push(vertex["opacity"])
-      }
-
-      // Scale (for Gaussian splatting)
-      if (vertex["scale_0"] !== undefined) {
-        scales.push(vertex["scale_0"], vertex["scale_1"] || 0, vertex["scale_2"] || 0)
-      }
-
-      // Rotation (for Gaussian splatting)
-      if (vertex["rot_0"] !== undefined) {
-        rotations.push(
-          vertex["rot_0"] || 0,
-          vertex["rot_1"] || 0,
-          vertex["rot_2"] || 0,
-          vertex["rot_3"] || 0
-        )
-      }
-    }
-
-    // Set geometry attributes
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-
-    if (colors.length > 0) {
-      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
-    }
-
-    // Add custom attributes for Gaussian Splatting if present
-    if (opacities.length > 0) {
-      geometry.setAttribute("opacity", new THREE.Float32BufferAttribute(opacities, 1))
-    }
-
-    if (scales.length > 0) {
-      geometry.setAttribute("scale", new THREE.Float32BufferAttribute(scales, 3))
-    }
-
-    if (rotations.length > 0) {
-      geometry.setAttribute("rotation", new THREE.Float32BufferAttribute(rotations, 4))
-    }
-
-    return geometry
-  }
-
-  parseASCII(data: string, geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-    const lines = data.split("\n")
-    let vertexCount = 0
-    let vertexStartIndex = 0
-    const properties: Array<{ name: string, type: string }> = []
-
-    // Parse header
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim()
-
-      if (line.startsWith("element vertex")) {
-        vertexCount = Number.parseInt(line.split(" ")[2])
-      } else if (line.startsWith("property")) {
-        const parts = line.split(" ")
-        properties.push({
-          type: parts[1],
-          name: parts[2]
-        })
-      } else if (line === "end_header") {
-        vertexStartIndex = i + 1
-        break
-      }
-    }
-
-    if (vertexCount === 0) {
-      console.error("PLYLoader: No vertices found")
-      return geometry
-    }
-
-    // Check if this is a Gaussian Splatting file
-    const hasFeaturesDC = properties.some(p => p.name.startsWith("f_dc_"))
-    const hasShFeatures = properties.some(p => p.name.startsWith("f_rest_"))
-
-    // Prepare arrays for vertex data
-    const positions: number[] = []
-    const colors: number[] = []
-    const opacities: number[] = []
-    const scales: number[] = []
-    const rotations: number[] = []
-
-    // Parse vertices
-    for (let i = 0; i < vertexCount; i++) {
-      const line = lines[vertexStartIndex + i].trim()
-      if (!line) continue
-
-      const values = line.split(/\s+/)
-      const vertex: Record<string, number> = {}
-
-      // Map values to properties
-      for (let j = 0; j < properties.length; j++) {
-        if (j < values.length) {
-          vertex[properties[j].name] = Number.parseFloat(values[j])
-        }
-      }
-
-      // Position (required)
-      positions.push(vertex["x"] || 0)
-      positions.push(vertex["y"] || 0)
-      positions.push(vertex["z"] || 0)
-
-      // Color handling
-      if (hasFeaturesDC) {
-        // Using SH coefficients for color (Gaussian Splatting)
-        const r = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_0"] || 0)), 1);
-        const g = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_1"] || 0)), 1);
-        const b = Math.min(Math.max(0, this.sigmoid(vertex["f_dc_2"] || 0)), 1);
-
-        colors.push(r, g, b);
-      } else if (vertex["red"] !== undefined) {
-        // Standard color format
-        const r = vertex["red"] / 255;
-        const g = vertex["green"] / 255;
-        const b = vertex["blue"] / 255;
-        colors.push(r, g, b);
-      } else if (vertex["r"] !== undefined) {
-        // Alternative color naming
-        const r = vertex["r"] / 255;
-        const g = vertex["g"] / 255;
-        const b = vertex["b"] / 255;
-        colors.push(r, g, b);
       }
 
       // Opacity (for Gaussian splatting)
