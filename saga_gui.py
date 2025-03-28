@@ -58,6 +58,7 @@ class CONFIG:
     compute_cov3D_python = False
 
     white_background = False
+    antialiasing = True
 
     FEATURE_DIM = 32
     MODEL_PATH = "./output/garden"  # 30000
@@ -734,6 +735,7 @@ class GaussianSplattingGUI:
         fy = fov2focal(fovy, self.height)
         fovx = focal2fov(fy, self.width)
 
+        # Create the camera with the required additional parameters
         cam = Camera(
             colmap_id=0,
             R=R,
@@ -744,6 +746,9 @@ class GaussianSplattingGUI:
             gt_alpha_mask=None,
             image_name=None,
             uid=0,
+            resolution=(self.width, self.height),
+            depth_params={},
+            invdepthmap=None,
         )
         cam.feature_height, cam.feature_width = self.height, self.width
         return cam
@@ -828,7 +833,7 @@ class GaussianSplattingGUI:
     def fetch_data(self, view_camera):
 
         scene_outputs = render(
-            view_camera, self.engine["scene"], self.opt, self.bg_color
+            view_camera, self.engine["scene"], self.opt, self.bg_color, separate_sh=True
         )
         feature_outputs = render_contrastive_feature(
             view_camera, self.engine["feature"], self.opt, self.bg_feature
