@@ -125,25 +125,27 @@ export default function GaussianSplattingViewer() {
                       Select Models:
                     </Label>
                     <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {Object.keys(folderData.refinedPly).map((modelName) => (
-                        <div key={modelName} className="flex items-center space-x-2 py-1">
-                          <Checkbox
-                            id={`model-${modelName}`}
-                            checked={selectedModels.includes(modelName)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedModels(prev => [...prev, modelName]);
-                              } else {
-                                setSelectedModels(prev => prev.filter(m => m !== modelName));
-                              }
-                              setUseFolder(true);
-                            }}
-                          />
-                          <Label htmlFor={`model-${modelName}`} className="cursor-pointer">
-                            {modelName}
-                          </Label>
-                        </div>
-                      ))}
+                      {Object.keys(folderData.refinedPly)
+                        .sort()
+                        .map((modelName) => (
+                          <div key={modelName} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`model-${modelName}`}
+                              checked={selectedModels.includes(modelName)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedModels(prev => [...prev, modelName]);
+                                } else {
+                                  setSelectedModels(prev => prev.filter(m => m !== modelName));
+                                }
+                                setUseFolder(true);
+                              }}
+                            />
+                            <Label htmlFor={`model-${modelName}`} className="cursor-pointer">
+                              {modelName}
+                            </Label>
+                          </div>
+                        ))}
                     </div>
                     <div className="mt-2 flex justify-between">
                       <Button
