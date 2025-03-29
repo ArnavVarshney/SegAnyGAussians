@@ -1118,29 +1118,34 @@ class GaussianSplattingGUI:
             model, preprocess = clip.load("ViT-B/32", device=device)
 
             image = preprocess(img_pil).unsqueeze(0).to(device)
+            try:
+                import json
+                import urllib.request
+                
+                category_path = "./clip_categories.json"
+                
+                if not os.path.exists(category_path):
+                    print("Downloading expanded category list...")
+                    url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/refs/heads/master/imagenet-simple-labels.json"
+                    with urllib.request.urlopen(url) as response:
+                        categories = json.loads(response.read().decode())
+                        # Use all categories or a subset
+                        max_categories = 100000  # Adjust based on memory
+                        categories = categories[:max_categories]
+                        with open(category_path, "w") as f:
+                            json.dump(categories, f)
+                else:
+                    with open(category_path, "r") as f:
+                        categories = json.load(f)
+            except Exception as e:
+                print(f"Error loading categories: {e}")
+                # Fallback to default categories
+                categories = [
+                    "person", "car", "chair", "table", "plant", "sofa", "bed", 
+                    "lamp", "computer", "book", "building", "tree", "window", 
+                    "door", "floor", "wall", "ceiling", "stairs", "bicycle", "bottle"
+                ]
 
-            categories = [
-                "person",
-                "car",
-                "chair",
-                "table",
-                "plant",
-                "sofa",
-                "bed",
-                "lamp",
-                "computer",
-                "book",
-                "building",
-                "tree",
-                "window",
-                "door",
-                "floor",
-                "wall",
-                "ceiling",
-                "stairs",
-                "bicycle",
-                "bottle",
-            ]
             text = clip.tokenize(
                 ["a photo of a " + category for category in categories]
             ).to(device)
