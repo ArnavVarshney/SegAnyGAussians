@@ -29,6 +29,7 @@ for dir in submodules/*/; do
     fi
 done
 pip install git+https://github.com/facebookresearch/pytorch3d.git@stable
+pip install git+https://github.com/openai/CLIP.git
 
 echo "Downloading pre-trained models"
 mkdir ./submodules/segment-anything/sam_ckpt

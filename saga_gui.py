@@ -1118,29 +1118,7 @@ class GaussianSplattingGUI:
             model, preprocess = clip.load("ViT-B/32", device=device)
 
             image = preprocess(img_pil).unsqueeze(0).to(device)
-            try:
-                import json
-                import urllib.request
-
-                category_path = "./clip_categories.json"
-
-                if not os.path.exists(category_path):
-                    print("Downloading expanded category list...")
-                    url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/refs/heads/master/imagenet-simple-labels.json"
-                    with urllib.request.urlopen(url) as response:
-                        categories = json.loads(response.read().decode())
-                        # Use all categories or a subset
-                        max_categories = 100000  # Adjust based on memory
-                        categories = categories[:max_categories]
-                        with open(category_path, "w") as f:
-                            json.dump(categories, f)
-                else:
-                    with open(category_path, "r") as f:
-                        categories = json.load(f)
-            except Exception as e:
-                print(f"Error loading categories: {e}")
-                # Fallback to default categories
-                categories = [
+            categories = [
                     "person",
                     "car",
                     "chair",
@@ -1163,6 +1141,7 @@ class GaussianSplattingGUI:
                     "bottle",
                 ]
 
+
             text = clip.tokenize(
                 ["a photo of a " + category for category in categories]
             ).to(device)
@@ -1183,20 +1162,8 @@ class GaussianSplattingGUI:
             values, indices = similarity[0].topk(5)
 
             # Save results
-            os.makedirs("./segmentation_res/identified", exist_ok=True)
             top_category = categories[indices[0]]
             confidence = values[0].item() * 100
-
-            save_mask = (
-                self.engine["scene"]._mask == self.engine["scene"].segment_times + 1
-            )
-            torch.save(
-                save_mask,
-                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.pt",
-            )
-            img_pil.save(
-                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.png"
-            )
 
             with dpg.window(
                 label="Object Identification Results", width=300, height=200
@@ -1212,9 +1179,6 @@ class GaussianSplattingGUI:
             with dpg.window(label="Error", width=300, height=100):
                 dpg.add_text("CLIP is not installed. Please install it with:")
                 dpg.add_text("pip install git+https://github.com/openai/CLIP.git")
-        except Exception as e:
-            with dpg.window(label="Error", width=300, height=100):
-                dpg.add_text(f"Error identifying object: {str(e)}")
 
 
 if __name__ == "__main__":
