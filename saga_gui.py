@@ -639,6 +639,8 @@ class GaussianSplattingGUI:
 
         print(f"Saving {num_clusters} cluster masks...")
         skip = 0
+        
+        all_clusters_info = []
 
         for cluster_id in range(num_clusters):
             cluster_mask = cluster_assignments == cluster_id
@@ -650,27 +652,47 @@ class GaussianSplattingGUI:
                 else 0.5
             )
             final_mask = cluster_mask & (confidence > threshold)
+            num_points = final_mask.sum().item()
 
-            if final_mask.sum() < self.opt.MAX_POINTS:
+            if num_points < self.opt.MAX_POINTS:
                 print(
                     f"Skipping cluster {cluster_id} as it has too few points after thresholding"
                 )
                 skip += 1
                 continue
 
-            os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
+            cluster_info = {
+                "cluster_id": cluster_id,
+                "num_points": num_points,
+                "confidence_threshold": threshold,
+                "mask_path": f"./segmentation_res/clusters/{cluster_id}/mask.pt"
+            }
+            all_clusters_info.append(cluster_info)
 
+            os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
             torch.save(final_mask, f"./segmentation_res/clusters/{cluster_id}/mask.pt")
 
             with open(f"./segmentation_res/clusters/{cluster_id}/info.txt", "w") as f:
                 f.write(f"Cluster ID: {cluster_id}\n")
-                f.write(f"Points in cluster: {final_mask.sum().item()}\n")
+                f.write(f"Points in cluster: {num_points}\n")
                 f.write(f"Confidence threshold: {threshold}\n")
-                f.write(f"RGB color: {self.label_to_color[cluster_id].tolist()}\n")
+
+        import json
+        global_info = {
+            "total_clusters": num_clusters,
+            "valid_clusters": num_clusters - skip,
+            "min_points_threshold": self.opt.MAX_POINTS,
+            "creation_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "clusters": all_clusters_info
+        }
+        
+        with open("./segmentation_res/clusters/info.json", "w") as f:
+            json.dump(global_info, f, indent=2)
 
         print(
             f"All {num_clusters - skip} cluster masks saved to ./segmentation_res/clusters/"
         )
+        print(f"Global cluster information saved to ./segmentation_res/clusters/info.json")
 
     def render_all_cluster_masks(self):
         from gaussian_renderer import render
