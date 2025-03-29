@@ -672,11 +672,6 @@ class GaussianSplattingGUI:
             os.makedirs(f"./segmentation_res/clusters/{cluster_id}", exist_ok=True)
             torch.save(final_mask, f"./segmentation_res/clusters/{cluster_id}/mask.pt")
 
-            with open(f"./segmentation_res/clusters/{cluster_id}/info.txt", "w") as f:
-                f.write(f"Cluster ID: {cluster_id}\n")
-                f.write(f"Points in cluster: {num_points}\n")
-                f.write(f"Confidence threshold: {threshold}\n")
-
         import json
         global_info = {
             "total_clusters": num_clusters,
