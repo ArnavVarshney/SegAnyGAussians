@@ -65,6 +65,7 @@ class CONFIG:
 
     FEATURE_GAUSSIAN_ITERATION = 10000
     SCENE_GAUSSIAN_ITERATION = 30000
+    MAX_POINTS = 10000
 
     SCALE_GATE_PATH = os.path.join(
         MODEL_PATH,
@@ -484,6 +485,15 @@ class GaussianSplattingGUI:
             )
             dpg.add_text("\n")
 
+            dpg.add_slider_int(
+                label="Max Points",
+                default_value=self.opt.MAX_POINTS,
+                min_value=1000,
+                max_value=100000,
+                callback=lambda s, a: setattr(self.opt, "MAX_POINTS", a),
+                tag="_MaxPoints",
+            )
+
             dpg.add_button(
                 label="cluster3d", callback=callback_cluster, user_data="Some Data"
             )
@@ -641,7 +651,7 @@ class GaussianSplattingGUI:
             )
             final_mask = cluster_mask & (confidence > threshold)
 
-            if final_mask.sum() < 10000:
+            if final_mask.sum() < self.opt.MAX_POINTS:
                 print(
                     f"Skipping cluster {cluster_id} as it has too few points after thresholding"
                 )
