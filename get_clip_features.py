@@ -5,7 +5,13 @@ from argparse import ArgumentParser
 
 
 def identify_all_clusters_with_clip(clusters_root, num_images):
-    """Use CLIP to identify all rendered cluster objects based on their rendered images"""
+    """
+    Use CLIP to identify all rendered cluster objects based on their rendered images
+
+    Args:
+        clusters_root: Path to the clusters directory
+        num_images: Number of images to process per cluster
+    """
     import clip
     from PIL import Image
     import json
