@@ -28,10 +28,12 @@ from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 from scipy.spatial.transform import Rotation as R
 
 from cuml.cluster.hdbscan import HDBSCAN
+
 # from hdbscan import HDBSCAN
 
 try:
     from diff_gaussian_rasterization import SparseGaussianAdam
+
     SPARSE_ADAM_AVAILABLE = True
 except:
     SPARSE_ADAM_AVAILABLE = False
@@ -483,9 +485,9 @@ class GaussianSplattingGUI:
                 label="", default_value="precomputed_mask", tag="save_name"
             )
             dpg.add_button(
-                label="Identify with CLIP", 
-                callback=callback_identify_with_clip, 
-                user_data="Some Data"
+                label="Identify with CLIP",
+                callback=callback_identify_with_clip,
+                user_data="Some Data",
             )
             dpg.add_text("\n")
 
@@ -692,7 +694,7 @@ class GaussianSplattingGUI:
         print(f"Found {len(cluster_dirs)} cluster masks. Rendering images for each...")
         args.depths = ""
         args.train_test_exp = False
-        
+
         scene = Scene(
             args,
             self.engine["scene"],
@@ -710,17 +712,25 @@ class GaussianSplattingGUI:
                 continue
 
             mask = torch.load(mask_path)
-            gaussian_model = deepcopy(self.engine["scene"])
+            self.engine["scene"].segment(mask)
 
             for view in scene.getTrainCameras():
-                gaussian_model.segment(mask)
-                res = render(view, gaussian_model, self.opt, self.bg_color, separate_sh=SPARSE_ADAM_AVAILABLE)
-                rendering = res["render"]
+                rendering = render(
+                    view,
+                    self.engine["scene"],
+                    self.opt,
+                    self.bg_color,
+                    override_color=None,
+                    separate_sh=SPARSE_ADAM_AVAILABLE,
+                )["render"]
                 torchvision.utils.save_image(
                     rendering,
-                    os.path.join(clusters_root, str(cluster_id), f"{view.image_name}.png"),
+                    os.path.join(
+                        clusters_root, str(cluster_id), f"{view.image_name}.png"
+                    ),
                 )
-                gaussian_model.clear_segment()
+
+            self.engine["scene"].clear_segment()
 
         print(f"All cluster masks rendered.")
 
@@ -847,7 +857,11 @@ class GaussianSplattingGUI:
     @torch.no_grad()
     def fetch_data(self, view_camera):
         scene_outputs = render(
-            view_camera, self.engine["scene"], self.opt, self.bg_color, separate_sh=SPARSE_ADAM_AVAILABLE,
+            view_camera,
+            self.engine["scene"],
+            self.opt,
+            self.bg_color,
+            separate_sh=SPARSE_ADAM_AVAILABLE,
         )
         feature_outputs = render_contrastive_feature(
             view_camera, self.engine["feature"], self.opt, self.bg_feature
@@ -1076,72 +1090,102 @@ class GaussianSplattingGUI:
         try:
             import clip
             from PIL import Image
-            
-            if not hasattr(self, 'score_pts_binary') or self.score_pts_binary is None:
+
+            if not hasattr(self, "score_pts_binary") or self.score_pts_binary is None:
                 print("No segmented object found. Please segment an object first.")
                 with dpg.window(label="Warning", width=300, height=100):
-                    dpg.add_text("No segmented object found. Please segment an object first.")
+                    dpg.add_text(
+                        "No segmented object found. Please segment an object first."
+                    )
                 return
-                
+
             view_camera = self.construct_camera()
             seg_output = render(
-                view_camera, 
-                self.engine["scene"], 
-                self.opt, 
+                view_camera,
+                self.engine["scene"],
+                self.opt,
                 self.bg_color,
                 override_color=None,
                 separate_sh=SPARSE_ADAM_AVAILABLE,
             )
             rendering = seg_output["render"]
-            
+
             img_tensor = rendering.permute(1, 2, 0).cpu()
             img_np = (img_tensor.detach().numpy() * 255).astype(np.uint8)
             img_pil = Image.fromarray(img_np)
-            
+
             device = "cuda" if torch.cuda.is_available() else "cpu"
             model, preprocess = clip.load("ViT-B/32", device=device)
-            
+
             image = preprocess(img_pil).unsqueeze(0).to(device)
-            
+
             categories = [
-                "person", "car", "chair", "table", "plant", "sofa", "bed", "lamp", 
-                "computer", "book", "building", "tree", "window", "door", 
-                "floor", "wall", "ceiling", "stairs", "bicycle", "bottle"
+                "person",
+                "car",
+                "chair",
+                "table",
+                "plant",
+                "sofa",
+                "bed",
+                "lamp",
+                "computer",
+                "book",
+                "building",
+                "tree",
+                "window",
+                "door",
+                "floor",
+                "wall",
+                "ceiling",
+                "stairs",
+                "bicycle",
+                "bottle",
             ]
-            text = clip.tokenize(["a photo of a " + category for category in categories]).to(device)
-            
+            text = clip.tokenize(
+                ["a photo of a " + category for category in categories]
+            ).to(device)
+
             # Get predictions
             with torch.no_grad():
                 image_features = model.encode_image(image)
                 text_features = model.encode_text(text)
-                
+
                 # Normalize features
                 image_features /= image_features.norm(dim=-1, keepdim=True)
                 text_features /= text_features.norm(dim=-1, keepdim=True)
-                
+
                 # Calculate similarity scores
                 similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
-                
+
             # Get top matches
             values, indices = similarity[0].topk(5)
-            
+
             # Save results
             os.makedirs("./segmentation_res/identified", exist_ok=True)
             top_category = categories[indices[0]]
             confidence = values[0].item() * 100
-            
-            save_mask = self.engine["scene"]._mask == self.engine["scene"].segment_times + 1
-            torch.save(save_mask, f"./segmentation_res/identified/{top_category}_{confidence:.2f}.pt")
-            img_pil.save(f"./segmentation_res/identified/{top_category}_{confidence:.2f}.png")
-            
-            with dpg.window(label="Object Identification Results", width=300, height=200):
+
+            save_mask = (
+                self.engine["scene"]._mask == self.engine["scene"].segment_times + 1
+            )
+            torch.save(
+                save_mask,
+                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.pt",
+            )
+            img_pil.save(
+                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.png"
+            )
+
+            with dpg.window(
+                label="Object Identification Results", width=300, height=200
+            ):
                 dpg.add_text(f"Identified as: {top_category}")
                 dpg.add_text(f"Confidence: {confidence:.2f}%")
                 dpg.add_text("Other possibilities:")
                 for i, (value, index) in enumerate(zip(values[1:], indices[1:])):
                     dpg.add_text(f"  {categories[index]}: {100 * value.item():.2f}%")
                 dpg.add_text(f"\nResults saved to ./segmentation_res/identified/")
-            
+
         except ImportError:
             with dpg.window(label="Error", width=300, height=100):
                 dpg.add_text("CLIP is not installed. Please install it with:")
