@@ -426,7 +426,7 @@ class GaussianSplattingGUI:
             )
             dpg.add_slider_float(
                 label="ScoreThres",
-                default_value=0.9,
+                default_value=0.95,
                 min_value=0.0,
                 max_value=1.0,
                 tag="_ScoreThres",
@@ -1088,97 +1088,145 @@ class GaussianSplattingGUI:
 
     def identify_with_clip(self):
         """Use CLIP to identify the segmented object"""
-        try:
-            import clip
-            from PIL import Image
+        import clip
+        from PIL import Image
 
-            if not hasattr(self, "score_pts_binary") or self.score_pts_binary is None:
-                print("No segmented object found. Please segment an object first.")
-                with dpg.window(label="Warning", width=300, height=100):
-                    dpg.add_text(
-                        "No segmented object found. Please segment an object first."
-                    )
-                return
+        if not hasattr(self, "score_pts_binary") or self.score_pts_binary is None:
+            print("No segmented object found. Please segment an object first.")
+            with dpg.window(label="Warning", width=300, height=100):
+                dpg.add_text(
+                    "No segmented object found. Please segment an object first."
+                )
+            return
 
-            view_camera = self.construct_camera()
-            seg_output = old_render(
-                view_camera,
-                self.engine["scene"],
-                self.opt,
-                self.bg_color,
-                override_color=None,
-            )
-            rendering = seg_output["render"]
+        view_camera = self.construct_camera()
+        seg_output = old_render(
+            view_camera,
+            self.engine["scene"],
+            self.opt,
+            self.bg_color,
+            override_color=None,
+        )
+        rendering = seg_output["render"]
 
-            img_tensor = rendering.permute(1, 2, 0).cpu()
-            img_np = (img_tensor.detach().numpy() * 255).astype(np.uint8)
-            img_pil = Image.fromarray(img_np)
+        img_tensor = rendering.permute(1, 2, 0).cpu()
+        img_np = (img_tensor.detach().numpy() * 255).astype(np.uint8)
+        img_pil = Image.fromarray(img_np)
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model, preprocess = clip.load("ViT-B/32", device=device)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model, preprocess = clip.load("ViT-B/32", device=device)
 
-            image = preprocess(img_pil).unsqueeze(0).to(device)
-            categories = [
-                    "person",
-                    "car",
-                    "chair",
-                    "table",
-                    "plant",
-                    "sofa",
-                    "bed",
-                    "lamp",
-                    "computer",
-                    "book",
-                    "building",
-                    "tree",
-                    "window",
-                    "door",
-                    "floor",
-                    "wall",
-                    "ceiling",
-                    "stairs",
-                    "bicycle",
-                    "bottle",
-                ]
+        image = preprocess(img_pil).unsqueeze(0).to(device)
+        categories = [
+            "person",
+            "man",
+            "woman",
+            "child",
+            "baby",
+            "car",
+            "truck",
+            "motorcycle",
+            "bicycle",
+            "bus",
+            "train",
+            "chair",
+            "armchair",
+            "stool",
+            "bench",
+            "table",
+            "desk",
+            "coffee table",
+            "dining table",
+            "plant",
+            "tree",
+            "flower",
+            "bush",
+            "grass",
+            "sofa",
+            "couch",
+            "bed",
+            "mattress",
+            "lamp",
+            "light",
+            "chandelier",
+            "computer",
+            "laptop",
+            "monitor",
+            "keyboard",
+            "mouse",
+            "book",
+            "magazine",
+            "newspaper",
+            "bookshelf",
+            "building",
+            "house",
+            "apartment",
+            "skyscraper",
+            "office building",
+            "window",
+            "door",
+            "gate",
+            "fence",
+            "floor",
+            "carpet",
+            "tile",
+            "wood floor",
+            "wall",
+            "ceiling",
+            "stairs",
+            "railing",
+            "bottle",
+            "cup",
+            "glass",
+            "mug",
+            "plate",
+            "bowl",
+            "backpack",
+            "suitcase",
+            "handbag",
+            "box",
+            "package",
+            "painting",
+            "picture",
+            "photo",
+            "artwork",
+            "pillow",
+            "blanket",
+            "curtain",
+            "rug",
+            "refrigerator",
+            "oven",
+            "microwave",
+            "sink",
+            "bathtub",
+            "toilet",
+        ]
 
+        text = clip.tokenize(
+            ["a photo of a " + category for category in categories]
+        ).to(device)
 
-            text = clip.tokenize(
-                ["a photo of a " + category for category in categories]
-            ).to(device)
+        with torch.no_grad():
+            image_features = model.encode_image(image)
+            text_features = model.encode_text(text)
 
-            # Get predictions
-            with torch.no_grad():
-                image_features = model.encode_image(image)
-                text_features = model.encode_text(text)
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
 
-                # Normalize features
-                image_features /= image_features.norm(dim=-1, keepdim=True)
-                text_features /= text_features.norm(dim=-1, keepdim=True)
+            similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
-                # Calculate similarity scores
-                similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+        values, indices = similarity[0].topk(5)
+        top_category = categories[indices[0]]
+        confidence = values[0].item() * 100
 
-            # Get top matches
-            values, indices = similarity[0].topk(5)
-
-            # Save results
-            top_category = categories[indices[0]]
-            confidence = values[0].item() * 100
-
-            with dpg.window(
-                label="Object Identification Results", width=300, height=200
-            ):
-                dpg.add_text(f"Identified as: {top_category}")
-                dpg.add_text(f"Confidence: {confidence:.2f}%")
-                dpg.add_text("Other possibilities:")
-                for i, (value, index) in enumerate(zip(values[1:], indices[1:])):
-                    dpg.add_text(f"  {categories[index]}: {100 * value.item():.2f}%")
-                dpg.add_text(f"\nResults saved to ./segmentation_res/identified/")
-
-        except ImportError:
-            with dpg.window(label="Error", width=300, height=100):
-                dpg.add_text("CLIP is not installed. Please install it with:")
-                dpg.add_text("pip install git+https://github.com/openai/CLIP.git")
+        with dpg.window(
+            label="Object Identification Results", width=300, height=200
+        ):
+            dpg.add_text(f"Identified as: {top_category}")
+            dpg.add_text(f"Confidence: {confidence:.2f}%")
+            dpg.add_text("Other possibilities:")
+            for i, (value, index) in enumerate(zip(values[1:], indices[1:])):
+                dpg.add_text(f"  {categories[index]}: {100 * value.item():.2f}%")
 
 
 if __name__ == "__main__":
