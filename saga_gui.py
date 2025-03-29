@@ -5,7 +5,7 @@ from scene import Scene
 import os
 from tqdm import tqdm
 from os import makedirs
-from gaussian_renderer import render, render_contrastive_feature
+from gaussian_renderer import old_render, render, render_contrastive_feature
 import torchvision
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
@@ -30,13 +30,6 @@ from scipy.spatial.transform import Rotation as R
 from cuml.cluster.hdbscan import HDBSCAN
 
 # from hdbscan import HDBSCAN
-
-try:
-    from diff_gaussian_rasterization import SparseGaussianAdam
-
-    SPARSE_ADAM_AVAILABLE = True
-except:
-    SPARSE_ADAM_AVAILABLE = False
 
 
 def depth2img(depth):
@@ -715,13 +708,12 @@ class GaussianSplattingGUI:
             self.engine["scene"].segment(mask)
 
             for view in scene.getTrainCameras():
-                rendering = render(
+                rendering = old_render(
                     view,
                     self.engine["scene"],
                     self.opt,
                     self.bg_color,
                     override_color=None,
-                    separate_sh=SPARSE_ADAM_AVAILABLE,
                 )["render"]
                 torchvision.utils.save_image(
                     rendering,
@@ -856,12 +848,11 @@ class GaussianSplattingGUI:
 
     @torch.no_grad()
     def fetch_data(self, view_camera):
-        scene_outputs = render(
+        scene_outputs = old_render(
             view_camera,
             self.engine["scene"],
             self.opt,
             self.bg_color,
-            separate_sh=SPARSE_ADAM_AVAILABLE,
         )
         feature_outputs = render_contrastive_feature(
             view_camera, self.engine["feature"], self.opt, self.bg_feature
@@ -875,7 +866,7 @@ class GaussianSplattingGUI:
         self.rendered_cluster = (
             None
             if self.cluster_point_colors is None
-            else render(
+            else old_render(
                 view_camera,
                 self.engine["scene"],
                 self.opt,
@@ -1100,13 +1091,12 @@ class GaussianSplattingGUI:
                 return
 
             view_camera = self.construct_camera()
-            seg_output = render(
+            seg_output = old_render(
                 view_camera,
                 self.engine["scene"],
                 self.opt,
                 self.bg_color,
                 override_color=None,
-                separate_sh=SPARSE_ADAM_AVAILABLE,
             )
             rendering = seg_output["render"]
 
@@ -1121,9 +1111,9 @@ class GaussianSplattingGUI:
             try:
                 import json
                 import urllib.request
-                
+
                 category_path = "./clip_categories.json"
-                
+
                 if not os.path.exists(category_path):
                     print("Downloading expanded category list...")
                     url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/refs/heads/master/imagenet-simple-labels.json"
@@ -1141,9 +1131,26 @@ class GaussianSplattingGUI:
                 print(f"Error loading categories: {e}")
                 # Fallback to default categories
                 categories = [
-                    "person", "car", "chair", "table", "plant", "sofa", "bed", 
-                    "lamp", "computer", "book", "building", "tree", "window", 
-                    "door", "floor", "wall", "ceiling", "stairs", "bicycle", "bottle"
+                    "person",
+                    "car",
+                    "chair",
+                    "table",
+                    "plant",
+                    "sofa",
+                    "bed",
+                    "lamp",
+                    "computer",
+                    "book",
+                    "building",
+                    "tree",
+                    "window",
+                    "door",
+                    "floor",
+                    "wall",
+                    "ceiling",
+                    "stairs",
+                    "bicycle",
+                    "bottle",
                 ]
 
             text = clip.tokenize(
