@@ -176,6 +176,8 @@ if __name__ == "__main__":
     if args.precomputed_mask is not None:
         print("Using precomputed mask " + args.precomputed_mask)
 
+    args.depths = ""
+    args.train_test_exp = False
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
