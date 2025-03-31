@@ -5,7 +5,7 @@ from scene import Scene
 import os
 from tqdm import tqdm
 from os import makedirs
-from gaussian_renderer import render, render_contrastive_feature
+from gaussian_renderer import old_render, render, render_contrastive_feature
 import torchvision
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
@@ -403,6 +403,9 @@ class GaussianSplattingGUI:
         def render_all_masks_callback():
             self.render_all_cluster_masks()
 
+        def callback_identify_with_clip():
+            self.identify_with_clip()
+
         # control window
         with dpg.window(
             label="Control",
@@ -473,6 +476,11 @@ class GaussianSplattingGUI:
             )
             dpg.add_input_text(
                 label="", default_value="precomputed_mask", tag="save_name"
+            )
+            dpg.add_button(
+                label="Identify with CLIP",
+                callback=callback_identify_with_clip,
+                user_data="Some Data",
             )
             dpg.add_text("\n")
 
@@ -657,7 +665,7 @@ class GaussianSplattingGUI:
     def render_all_cluster_masks(self):
         from gaussian_renderer import render
         from copy import deepcopy
-        import re
+        from argparse import Namespace
 
         clusters_root = "./segmentation_res/clusters"
         if not os.path.exists(clusters_root):
@@ -677,6 +685,8 @@ class GaussianSplattingGUI:
             return
 
         print(f"Found {len(cluster_dirs)} cluster masks. Rendering images for each...")
+        args.depths = ""
+        args.train_test_exp = False
 
         scene = Scene(
             args,
@@ -695,17 +705,24 @@ class GaussianSplattingGUI:
                 continue
 
             mask = torch.load(mask_path)
-            gaussian_model = deepcopy(self.engine["scene"])
+            self.engine["scene"].segment(mask)
 
             for view in scene.getTrainCameras():
-                gaussian_model.segment(mask)
-                res = render(view, gaussian_model, args, self.bg_color)
-                rendering = res["render"]
+                rendering = old_render(
+                    view,
+                    self.engine["scene"],
+                    self.opt,
+                    self.bg_color,
+                    override_color=None,
+                )["render"]
                 torchvision.utils.save_image(
                     rendering,
-                    os.path.join(clusters_root, str(cluster_id), f"{view.uid}.png"),
+                    os.path.join(
+                        clusters_root, str(cluster_id), f"{view.image_name}.png"
+                    ),
                 )
-                gaussian_model.clear_segment()
+
+            self.engine["scene"].clear_segment()
 
         print(f"All cluster masks rendered.")
 
@@ -831,9 +848,11 @@ class GaussianSplattingGUI:
 
     @torch.no_grad()
     def fetch_data(self, view_camera):
-
-        scene_outputs = render(
-            view_camera, self.engine["scene"], self.opt, self.bg_color, separate_sh=True
+        scene_outputs = old_render(
+            view_camera,
+            self.engine["scene"],
+            self.opt,
+            self.bg_color,
         )
         feature_outputs = render_contrastive_feature(
             view_camera, self.engine["feature"], self.opt, self.bg_feature
@@ -847,7 +866,7 @@ class GaussianSplattingGUI:
         self.rendered_cluster = (
             None
             if self.cluster_point_colors is None
-            else render(
+            else old_render(
                 view_camera,
                 self.engine["scene"],
                 self.opt,
@@ -1056,6 +1075,136 @@ class GaussianSplattingGUI:
         self.render_buffer /= render_num
 
         dpg.set_value("_texture", self.render_buffer)
+
+    def identify_with_clip(self):
+        """Use CLIP to identify the segmented object"""
+        try:
+            import clip
+            from PIL import Image
+
+            if not hasattr(self, "score_pts_binary") or self.score_pts_binary is None:
+                print("No segmented object found. Please segment an object first.")
+                with dpg.window(label="Warning", width=300, height=100):
+                    dpg.add_text(
+                        "No segmented object found. Please segment an object first."
+                    )
+                return
+
+            view_camera = self.construct_camera()
+            seg_output = old_render(
+                view_camera,
+                self.engine["scene"],
+                self.opt,
+                self.bg_color,
+                override_color=None,
+            )
+            rendering = seg_output["render"]
+
+            img_tensor = rendering.permute(1, 2, 0).cpu()
+            img_np = (img_tensor.detach().numpy() * 255).astype(np.uint8)
+            img_pil = Image.fromarray(img_np)
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model, preprocess = clip.load("ViT-B/32", device=device)
+
+            image = preprocess(img_pil).unsqueeze(0).to(device)
+            try:
+                import json
+                import urllib.request
+
+                category_path = "./clip_categories.json"
+
+                if not os.path.exists(category_path):
+                    print("Downloading expanded category list...")
+                    url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/refs/heads/master/imagenet-simple-labels.json"
+                    with urllib.request.urlopen(url) as response:
+                        categories = json.loads(response.read().decode())
+                        # Use all categories or a subset
+                        max_categories = 100000  # Adjust based on memory
+                        categories = categories[:max_categories]
+                        with open(category_path, "w") as f:
+                            json.dump(categories, f)
+                else:
+                    with open(category_path, "r") as f:
+                        categories = json.load(f)
+            except Exception as e:
+                print(f"Error loading categories: {e}")
+                # Fallback to default categories
+                categories = [
+                    "person",
+                    "car",
+                    "chair",
+                    "table",
+                    "plant",
+                    "sofa",
+                    "bed",
+                    "lamp",
+                    "computer",
+                    "book",
+                    "building",
+                    "tree",
+                    "window",
+                    "door",
+                    "floor",
+                    "wall",
+                    "ceiling",
+                    "stairs",
+                    "bicycle",
+                    "bottle",
+                ]
+
+            text = clip.tokenize(
+                ["a photo of a " + category for category in categories]
+            ).to(device)
+
+            # Get predictions
+            with torch.no_grad():
+                image_features = model.encode_image(image)
+                text_features = model.encode_text(text)
+
+                # Normalize features
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+                text_features /= text_features.norm(dim=-1, keepdim=True)
+
+                # Calculate similarity scores
+                similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+            # Get top matches
+            values, indices = similarity[0].topk(5)
+
+            # Save results
+            os.makedirs("./segmentation_res/identified", exist_ok=True)
+            top_category = categories[indices[0]]
+            confidence = values[0].item() * 100
+
+            save_mask = (
+                self.engine["scene"]._mask == self.engine["scene"].segment_times + 1
+            )
+            torch.save(
+                save_mask,
+                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.pt",
+            )
+            img_pil.save(
+                f"./segmentation_res/identified/{top_category}_{confidence:.2f}.png"
+            )
+
+            with dpg.window(
+                label="Object Identification Results", width=300, height=200
+            ):
+                dpg.add_text(f"Identified as: {top_category}")
+                dpg.add_text(f"Confidence: {confidence:.2f}%")
+                dpg.add_text("Other possibilities:")
+                for i, (value, index) in enumerate(zip(values[1:], indices[1:])):
+                    dpg.add_text(f"  {categories[index]}: {100 * value.item():.2f}%")
+                dpg.add_text(f"\nResults saved to ./segmentation_res/identified/")
+
+        except ImportError:
+            with dpg.window(label="Error", width=300, height=100):
+                dpg.add_text("CLIP is not installed. Please install it with:")
+                dpg.add_text("pip install git+https://github.com/openai/CLIP.git")
+        except Exception as e:
+            with dpg.window(label="Error", width=300, height=100):
+                dpg.add_text(f"Error identifying object: {str(e)}")
 
 
 if __name__ == "__main__":
