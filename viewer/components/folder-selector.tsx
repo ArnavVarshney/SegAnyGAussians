@@ -23,7 +23,7 @@ export default function FolderSelector({ onFolderSelected }: FolderSelectorProps
         setIsLoading(false);
       };
 
-      input.onchange = (e) => {
+      input.onchange = () => {
         const files = Array.from(input.files || []);
         const refinedMesh: Record<string, { obj: string; mtl: string; png: string }> = {};
         const refinedPly: Record<string, string> = {};

@@ -40,9 +40,6 @@ export default function MeshModel({
 
     const loadModel = async () => {
       try {
-        // Load material if provided
-        let materials: THREE.Material | THREE.Material[] | undefined
-
         if (mtlUrl) {
           const mtlLoader = new MTLLoader()
           const mtl = await new Promise<MaterialCreator>((resolve, reject) => {
