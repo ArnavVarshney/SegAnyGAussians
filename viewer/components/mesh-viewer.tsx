@@ -1,18 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import dynamic from 'next/dynamic'
-import { OrbitControls, Stats } from "@react-three/drei"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
+import { OrbitControls } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Sun, Moon } from "lucide-react"
-import FileUploader from "./file-uploader"
 import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
-import FolderSelector from "./folder-selector"
-import ModelList from "./model-list"
+import Sidebar from "./sidebar"
+import * as THREE from "three"
 
 const LazyCanvas = dynamic(
   () => import('@react-three/fiber').then(mod => mod.Canvas),
@@ -25,6 +21,18 @@ const LazyCanvas = dynamic(
     )
   }
 )
+
+function AxesHelper({ size = 1, visible = true }) {
+  const mesh = useRef<THREE.AxesHelper>(null);
+
+  return (
+    <axesHelper
+      ref={mesh}
+      args={[size]}
+      visible={visible}
+    />
+  );
+}
 
 type LightingSettings = {
   intensity: number;
@@ -76,7 +84,6 @@ export default function MeshViewer() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(true)
 
-  const [rotation, setRotation] = useState<[number, number, number]>([0, 0, 0])\
   const [lighting, setLighting] = useState<LightingSettings>({
     intensity: 1.0,
     ambientIntensity: 0.0,
@@ -138,14 +145,6 @@ export default function MeshViewer() {
     setIsDarkMode(prev => !prev)
   }, []);
 
-  const handleRotationChange = useCallback((axis: number, value: number) => {
-    setRotation(prev => {
-      const newRotation = [...prev] as [number, number, number];
-      newRotation[axis] = value;
-      return newRotation;
-    });
-  }, []);
-
   const handleSelectedModelsChange = useCallback((models: string[]) => {
     setSelectedModels(models);
     setUseFolder(true);
@@ -162,168 +161,18 @@ export default function MeshViewer() {
         <div
           className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${sidebarOpen ? "w-80" : "w-0 overflow-hidden"}`}
         >
-          <div className="p-4 border-b overflow-y-auto h-full">
-            <h1 className="text-xl font-bold mb-4">3D Mesh Viewer</h1>
-
-            <div className="space-y-4 mb-4">
-              <div>
-                <h2 className="text-md font-semibold mb-2">Folder Selection</h2>
-                <FolderSelector onFolderSelected={handleFolderSelected} />
-
-                {folderData && sortedModelNames.length > 0 && (
-                  <ModelList
-                    modelNames={sortedModelNames}
-                    selectedModels={selectedModels}
-                    onSelectionChange={handleSelectedModelsChange}
-                  />
-                )}
-              </div>
-
-              {!useFolder && (
-                <div>
-                  <div>
-                    <h2 className="text-md font-semibold mb-2">Mesh Model</h2>
-                    <div className="grid grid-cols-1 gap-2">
-                      <FileUploader
-                        accept=".obj"
-                        label="Upload OBJ file"
-                        onFileSelected={(file) => handleFileUpload("obj", file)}
-                        fileName={files.obj?.name}
-                      />
-                      <FileUploader
-                        accept=".mtl"
-                        label="Upload MTL file"
-                        onFileSelected={(file) => handleFileUpload("mtl", file)}
-                        fileName={files.mtl?.name}
-                      />
-                      <FileUploader
-                        accept=".png,.jpg,.jpeg"
-                        label="Upload texture"
-                        onFileSelected={(file) => handleFileUpload("texture", file)}
-                        fileName={files.texture?.name}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-md font-semibold mb-2">Lighting</h2>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="light-intensity" className="w-24">
-                      Light:
-                    </Label>
-                    <Slider
-                      id="light-intensity"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={[lighting.intensity]}
-                      onValueChange={(value) => updateLighting("intensity", value[0])}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-right">{lighting.intensity.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="ambient-intensity" className="w-24">
-                      Ambient:
-                    </Label>
-                    <Slider
-                      id="ambient-intensity"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={[lighting.ambientIntensity]}
-                      onValueChange={(value) => updateLighting("ambientIntensity", value[0])}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-right">{lighting.ambientIntensity.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="light-color" className="w-24">
-                      Light Color:
-                    </Label>
-                    <input
-                      type="color"
-                      id="light-color"
-                      value={lighting.lightColor}
-                      onChange={(e) => updateLighting("lightColor", e.target.value)}
-                      className="w-8 h-8 rounded-md border"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="ambient-color" className="w-24">
-                      Ambient Color:
-                    </Label>
-                    <input
-                      type="color"
-                      id="ambient-color"
-                      value={lighting.ambientColor}
-                      onChange={(e) => updateLighting("ambientColor", e.target.value)}
-                      className="w-8 h-8 rounded-md border"
-                    />
-                  </div>
-                </div>
-
-                <h2 className="text-md font-semibold mb-2 mt-4">Rotation</h2>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="rotation-x" className="w-24">
-                      X-axis:
-                    </Label>
-                    <Slider
-                      id="rotation-x"
-                      min={0}
-                      max={Math.PI * 2}
-                      step={0.01}
-                      value={[rotation[0]]}
-                      onValueChange={(value) => handleRotationChange(0, value[0])}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-right">{rotation[0].toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="rotation-y" className="w-24">
-                      Y-axis:
-                    </Label>
-                    <Slider
-                      id="rotation-y"
-                      min={0}
-                      max={Math.PI * 2}
-                      step={0.01}
-                      value={[rotation[1]]}
-                      onValueChange={(value) => handleRotationChange(1, value[0])}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-right">{rotation[1].toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="rotation-z" className="w-24">
-                      Z-axis:
-                    </Label>
-                    <Slider
-                      id="rotation-z"
-                      min={0}
-                      max={Math.PI * 2}
-                      step={0.01}
-                      value={[rotation[2]]}
-                      onValueChange={(value) => handleRotationChange(2, value[0])}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-right">{rotation[2].toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <Sidebar
+            folderData={folderData}
+            useFolder={useFolder}
+            files={files}
+            lighting={lighting}
+            selectedModels={selectedModels}
+            sortedModelNames={sortedModelNames}
+            onFolderSelected={handleFolderSelected}
+            handleFileUpload={handleFileUpload}
+            handleSelectedModelsChange={handleSelectedModelsChange}
+            updateLighting={updateLighting}
+          />
         </div>
 
         {/* Main Content */}
@@ -380,10 +229,14 @@ export default function MeshViewer() {
                 mtlUrl={urls.mtl}
                 textureUrl={urls.texture}
                 position={[0, 0, 0]}
-                rotation={rotation}
                 doubleSided={true}
               />
             )}
+
+            <AxesHelper
+              size={1000}
+              visible={true}
+            />
 
             <OrbitControls />
           </LazyCanvas>
