@@ -1,4 +1,6 @@
-import { useEffect, useRef, useMemo, memo } from "react"
+"use client"
+
+import { useEffect, useRef } from "react"
 import { useThree } from "@react-three/fiber"
 import { MaterialCreator, MTLLoader, OBJLoader } from "three-stdlib"
 import * as THREE from "three"
@@ -12,132 +14,132 @@ interface MeshModelProps {
   doubleSided?: boolean
 }
 
-const MeshModel = ({
+export default function MeshModel({
   objUrl,
   mtlUrl,
   textureUrl,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   doubleSided = true,
-}: MeshModelProps) => {
+}: MeshModelProps) {
   const { scene } = useThree()
   const modelRef = useRef<THREE.Group | null>(null)
-  const resourcesToCleanup = useRef<Array<{ dispose: () => void }>>([])
-
-  const quaternion = useMemo(() =>
-    new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(rotation[0], rotation[1], rotation[2])
-    ),
-    [rotation]
-  )
-
-  useEffect(() => {
-    scene.setRotationFromQuaternion(quaternion)
-  }, [scene, quaternion])
-
-  const applyDoubleSided = (material: THREE.Material) => {
-    if (doubleSided) {
-      material.side = THREE.DoubleSide
-      material.needsUpdate = true
-    }
-    return material
-  }
-
-  const applyTexture = (obj: THREE.Group, texture?: THREE.Texture) => {
-    obj.traverse((child) => {
-      if (!(child instanceof THREE.Mesh) || !child.material) return
-
-      if (Array.isArray(child.material)) {
-        child.material.forEach(mat => {
-          if (texture) mat.map = texture
-          applyDoubleSided(mat)
-        })
-      } else {
-        if (texture) child.material.map = texture
-        applyDoubleSided(child.material)
-      }
-    })
-  }
-
-  const loadTexture = (url: string): Promise<THREE.Texture> => {
-    const textureLoader = new THREE.TextureLoader()
-    return new Promise((resolve, reject) => {
-      textureLoader.load(
-        url, 
-        (texture) => {
-          resourcesToCleanup.current.push(texture);
-          resolve(texture);
-        }, 
-        undefined, 
-        reject
-      )
-    })
-  }
 
   useEffect(() => {
     if (!objUrl) return
 
-    const cleanup = () => {
+    const cleanupModel = () => {
       if (modelRef.current) {
-        scene.remove(modelRef.current)
-        modelRef.current.traverse(child => {
+        modelRef.current.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             if (child.geometry) {
-              child.geometry.dispose();
+              child.geometry.dispose()
             }
-            
+
             if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach(material => material.dispose());
-              } else {
-                child.material.dispose();
-              }
+              const materials = Array.isArray(child.material)
+                ? child.material
+                : [child.material]
+
+              materials.forEach(material => {
+                if (material.map) material.map.dispose()
+                material.dispose()
+              })
             }
           }
-        });
+        })
+
+        scene.remove(modelRef.current)
         modelRef.current = null
       }
-      resourcesToCleanup.current.forEach(resource => resource.dispose());
-      resourcesToCleanup.current = [];
     }
 
-    cleanup()
+    cleanupModel()
 
     const loadModel = async () => {
       try {
         const objLoader = new OBJLoader()
-        let texture: THREE.Texture | undefined;
-        
+
         if (mtlUrl) {
           const mtlLoader = new MTLLoader()
-          const mtl = await new Promise<MaterialCreator>((resolve, reject) => {
+          const materials = await new Promise<MaterialCreator>((resolve, reject) =>
             mtlLoader.load(mtlUrl, resolve, undefined, reject)
-          })
-          mtl.preload()
-          objLoader.setMaterials(mtl)
-          
-          Object.values(mtl.materials).forEach(material => {
-            resourcesToCleanup.current.push(material);
-          });
+          )
+
+          materials.preload()
+          objLoader.setMaterials(materials)
         }
-        
-        if (textureUrl) {
-          texture = await loadTexture(textureUrl);
-        }
-        
-        const obj = await new Promise<THREE.Group>((resolve, reject) => {
+
+        const obj = await new Promise<THREE.Group>((resolve, reject) =>
           objLoader.load(objUrl, resolve, undefined, reject)
-        })
-        
-        if (texture) {
-          applyTexture(obj, texture);
+        )
+
+        if (textureUrl) {
+          const textureLoader = new THREE.TextureLoader()
+          const texture = await new Promise<THREE.Texture>((resolve, reject) =>
+            textureLoader.load(textureUrl, resolve, undefined, reject)
+          )
+
+          if (!mtlUrl) {
+            const material = new THREE.MeshStandardMaterial({
+              map: texture,
+              side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+            })
+
+            obj.traverse(child => {
+              if (child instanceof THREE.Mesh) {
+                child.material = material
+              }
+            })
+          } else {
+            obj.traverse(child => {
+              if (child instanceof THREE.Mesh) {
+                if (child.material) {
+                  const materials = Array.isArray(child.material)
+                    ? child.material
+                    : [child.material]
+
+                  materials.forEach(mat => {
+                    mat.map = texture
+                    if (doubleSided) mat.side = THREE.DoubleSide
+                    mat.needsUpdate = true
+                  })
+                }
+              }
+            })
+          }
+        } else if (!mtlUrl) {
+          const material = new THREE.MeshStandardMaterial({
+            color: 0xcccccc,
+            side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+          })
+
+          obj.traverse(child => {
+            if (child instanceof THREE.Mesh) {
+              child.material = material
+            }
+          })
         } else if (doubleSided) {
-          applyTexture(obj);
+          obj.traverse(child => {
+            if (child instanceof THREE.Mesh && child.material) {
+              const materials = Array.isArray(child.material)
+                ? child.material
+                : [child.material]
+
+              materials.forEach(mat => {
+                mat.side = THREE.DoubleSide
+                mat.needsUpdate = true
+              })
+            }
+          })
         }
-        
-        obj.position.set(position[0], position[1], position[2])
+
+        obj.position.set(...position)
+        obj.rotation.set(...rotation)
+
         scene.add(obj)
         modelRef.current = obj
+
       } catch (error) {
         console.error("Error loading model:", error)
       }
@@ -145,10 +147,8 @@ const MeshModel = ({
 
     loadModel()
 
-    return cleanup
-  }, [objUrl, mtlUrl, textureUrl, position, scene, doubleSided])
+    return cleanupModel
+  }, [objUrl, mtlUrl, textureUrl, position, rotation, scene, doubleSided])
 
   return null
 }
-
-export default memo(MeshModel);
