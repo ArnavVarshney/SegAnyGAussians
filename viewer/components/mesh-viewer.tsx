@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import dynamic from 'next/dynamic'
 import { OrbitControls } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Sun, Moon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Sun, Moon, Ruler } from "lucide-react"
 import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
 import Sidebar from "./sidebar"
@@ -83,6 +83,7 @@ export default function MeshViewer() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [showAxes, setShowAxes] = useState(false)
 
   const [lighting, setLighting] = useState<LightingSettings>({
     intensity: 1.0,
@@ -145,6 +146,10 @@ export default function MeshViewer() {
     setIsDarkMode(prev => !prev)
   }, []);
 
+  const toggleAxes = useCallback(() => {
+    setShowAxes(prev => !prev)
+  }, []);
+
   const handleSelectedModelsChange = useCallback((models: string[]) => {
     setSelectedModels(models);
     setUseFolder(true);
@@ -197,6 +202,17 @@ export default function MeshViewer() {
             {isDarkMode ? <Sun /> : <Moon />}
           </Button>
 
+          {/* Axes Toggle Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute top-4 right-16 z-10 bg-background/80 backdrop-blur-sm"
+            onClick={toggleAxes}
+            title="Toggle axes"
+          >
+            <Ruler className={showAxes ? "text-primary" : "text-muted-foreground"} />
+          </Button>
+
           <LazyCanvas
             camera={{ position: [0, 0, 5], fov: 50 }}
             className="w-full h-full"
@@ -235,7 +251,7 @@ export default function MeshViewer() {
 
             <AxesHelper
               size={1000}
-              visible={true}
+              visible={showAxes}
             />
 
             <OrbitControls />
