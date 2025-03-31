@@ -4,9 +4,8 @@ import type { Metadata } from "next"
 import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
-  title: "Gaussian Splatting & Mesh Viewer",
-  description: "Interactive viewer for Gaussian splatting PLY files and 3D meshes",
-    generator: 'v0.dev'
+  title: "3D Mesh Viewer",
+  description: "Interactive viewer for 3D meshes",
 }
 
 export default function RootLayout({
