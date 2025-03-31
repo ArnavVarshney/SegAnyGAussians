@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react"
 import dynamic from 'next/dynamic'
 import { OrbitControls } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
@@ -22,7 +22,12 @@ const LazyCanvas = dynamic(
   }
 )
 
-function AxesHelper({ size = 1, visible = true }) {
+type AxesHelperProps = {
+  size?: number;
+  visible?: boolean;
+};
+
+const AxesHelper = memo(({ size = 1, visible = true }: AxesHelperProps) => {
   const mesh = useRef<THREE.AxesHelper>(null);
 
   return (
@@ -32,9 +37,15 @@ function AxesHelper({ size = 1, visible = true }) {
       visible={visible}
     />
   );
-}
+});
 
-function GridHelper({ size = 10, divisions = 10, visible = true }) {
+type GridHelperProps = {
+  size?: number;
+  divisions?: number;
+  visible?: boolean;
+};
+
+const GridHelper = memo(({ size = 10, divisions = 10, visible = true }: GridHelperProps) => {
   const mesh = useRef<THREE.GridHelper>(null);
 
   return (
@@ -45,7 +56,7 @@ function GridHelper({ size = 10, divisions = 10, visible = true }) {
       position={[0, -0.01, 0]}
     />
   );
-}
+});
 
 type LightingSettings = {
   intensity: number;
@@ -78,17 +89,18 @@ type FolderData = {
 };
 
 export default function MeshViewer() {
-  const [files, setFiles] = useState<MeshFiles>({
-    obj: null,
-    mtl: null,
-    texture: null,
-  })
-
-  const [urls, setUrls] = useState<FileUrls>({
-    obj: "",
-    mtl: "",
-    texture: "",
-  })
+  const [fileState, setFileState] = useState({
+    files: {
+      obj: null as File | null,
+      mtl: null as File | null,
+      texture: null as File | null,
+    },
+    urls: {
+      obj: "",
+      mtl: "",
+      texture: "",
+    }
+  });
 
   const [folderData, setFolderData] = useState<FolderData | null>(null)
   const [selectedModels, setSelectedModels] = useState<string[]>([])
@@ -106,23 +118,31 @@ export default function MeshViewer() {
   })
 
   useEffect(() => {
-    if (urls.obj) URL.revokeObjectURL(urls.obj);
-    if (urls.mtl) URL.revokeObjectURL(urls.mtl);
-    if (urls.texture) URL.revokeObjectURL(urls.texture);
+    if (fileState.urls.obj) URL.revokeObjectURL(fileState.urls.obj);
+    if (fileState.urls.mtl) URL.revokeObjectURL(fileState.urls.mtl);
+    if (fileState.urls.texture) URL.revokeObjectURL(fileState.urls.texture);
 
-    const newUrls = { obj: "", mtl: "", texture: "" };
-    if (files.obj) newUrls.obj = URL.createObjectURL(files.obj);
-    if (files.mtl) newUrls.mtl = URL.createObjectURL(files.mtl);
-    if (files.texture) newUrls.texture = URL.createObjectURL(files.texture);
+    const newUrls = {
+      obj: "",
+      mtl: "",
+      texture: ""
+    };
 
-    setUrls(newUrls);
+    if (fileState.files.obj) newUrls.obj = URL.createObjectURL(fileState.files.obj);
+    if (fileState.files.mtl) newUrls.mtl = URL.createObjectURL(fileState.files.mtl);
+    if (fileState.files.texture) newUrls.texture = URL.createObjectURL(fileState.files.texture);
+
+    setFileState(prev => ({
+      ...prev,
+      urls: newUrls
+    }));
 
     return () => {
       if (newUrls.obj) URL.revokeObjectURL(newUrls.obj);
       if (newUrls.mtl) URL.revokeObjectURL(newUrls.mtl);
       if (newUrls.texture) URL.revokeObjectURL(newUrls.texture);
     };
-  }, [files]);
+  }, [fileState.files]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -132,9 +152,15 @@ export default function MeshViewer() {
     }
   }, [isDarkMode])
 
-  const handleFileUpload = useCallback((type: keyof typeof files, file: File) => {
-    setFiles((prev) => ({ ...prev, [type]: file }))
-    setUseFolder(false)
+  const handleFileUpload = useCallback((type: string, file: File | null) => {
+    setFileState(prev => ({
+      ...prev,
+      files: {
+        ...prev.files,
+        [type]: file
+      }
+    }));
+    setUseFolder(false);
   }, []);
 
   const handleFolderSelected = useCallback((data: FolderData) => {
@@ -175,7 +201,7 @@ export default function MeshViewer() {
           <Sidebar
             folderData={folderData}
             useFolder={useFolder}
-            files={files}
+            files={fileState.files}
             lighting={lighting}
             selectedModels={selectedModels}
             sortedModelNames={sortedModelNames}
@@ -210,9 +236,24 @@ export default function MeshViewer() {
           </Button>
 
           <LazyCanvas
-            camera={{ position: [0, 0, 5], fov: 50 }}
+            camera={{
+              position: [0, 0, 5],
+              fov: 90
+            }}
             className="w-full h-full"
-            style={{ background: isDarkMode ? "#111" : "#f5f5f5" }}
+            style={{
+              background: isDarkMode ? "#111" : "#f5f5f5"
+            }}
+            frameloop="demand"
+            gl={{
+              powerPreference: "high-performance",
+              antialias: true,
+              // alpha: false,
+              // stencil: false,
+              // depth: true,
+            }}
+            // dpr={[1, 2]}
+            // performance={{ min: 0.5 }}
           >
             <SceneLighting
               intensity={lighting.intensity}
@@ -235,11 +276,11 @@ export default function MeshViewer() {
               ))
             }
 
-            {!useFolder && urls.obj && (
+            {!useFolder && fileState.urls.obj && (
               <MeshModel
-                objUrl={urls.obj}
-                mtlUrl={urls.mtl}
-                textureUrl={urls.texture}
+                objUrl={fileState.urls.obj}
+                mtlUrl={fileState.urls.mtl}
+                textureUrl={fileState.urls.texture}
                 position={[0, 0, 0]}
                 doubleSided={true}
               />
@@ -249,9 +290,9 @@ export default function MeshViewer() {
               size={1000}
               visible={showAxes}
             />
-            
-            <GridHelper 
-              size={1000} 
+
+            <GridHelper
+              size={1000}
               divisions={1000}
               visible={showAxes}
             />
