@@ -34,6 +34,19 @@ function AxesHelper({ size = 1, visible = true }) {
   );
 }
 
+function GridHelper({ size = 10, divisions = 10, visible = true }) {
+  const mesh = useRef<THREE.GridHelper>(null);
+
+  return (
+    <gridHelper
+      ref={mesh}
+      args={[size, divisions]}
+      visible={visible}
+      position={[0, -0.01, 0]}
+    />
+  );
+}
+
 type LightingSettings = {
   intensity: number;
   ambientIntensity: number;
@@ -251,6 +264,12 @@ export default function MeshViewer() {
 
             <AxesHelper
               size={1000}
+              visible={showAxes}
+            />
+            
+            <GridHelper 
+              size={1000} 
+              divisions={1000}
               visible={showAxes}
             />
 
