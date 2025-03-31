@@ -55,7 +55,7 @@ export default function Sidebar({
 }: SidebarProps) {
   return (
     <div className="p-4 border-b overflow-y-auto h-full">
-      <h1 className="text-xl font-bold mb-4">3D Mesh Viewer</h1>
+      <h1 className="text-xl font-bold mb-4 w-80">3D Mesh Viewer</h1>
       <div className="space-y-4 mb-4">
         <div>
           <h2 className="text-md font-semibold mb-2">Folder Selection</h2>

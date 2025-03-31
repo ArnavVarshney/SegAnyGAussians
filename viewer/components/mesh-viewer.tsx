@@ -88,7 +88,7 @@ export default function MeshViewer() {
   const [lighting, setLighting] = useState<LightingSettings>({
     intensity: 1.0,
     ambientIntensity: 0.0,
-    lightPosition: [5, 5, 5],
+    lightPosition: [-5, -5, -5],
     lightColor: "#ffffff",
     ambientColor: "#404060",
   })
