@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Canvas } from "@react-three/fiber"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import dynamic from 'next/dynamic'
 import { OrbitControls, Stats } from "@react-three/drei"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
@@ -12,56 +12,98 @@ import FileUploader from "./file-uploader"
 import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
 import FolderSelector from "./folder-selector"
-import { Checkbox } from "@/components/ui/checkbox"
+import ModelList from "./model-list"
+
+const LazyCanvas = dynamic(
+  () => import('@react-three/fiber').then(mod => mod.Canvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="text-lg">Loading 3D viewer...</div>
+      </div>
+    )
+  }
+)
+
+type LightingSettings = {
+  intensity: number;
+  ambientIntensity: number;
+  lightPosition: [number, number, number];
+  lightColor: string;
+  ambientColor: string;
+};
+
+type MeshFiles = {
+  obj: File | null;
+  mtl: File | null;
+  texture: File | null;
+};
+
+type FileUrls = {
+  obj: string;
+  mtl: string;
+  texture: string;
+};
+
+type MeshData = {
+  obj: string;
+  mtl: string;
+  png: string;
+};
+
+type FolderData = {
+  refinedMesh: Record<string, MeshData>;
+};
 
 export default function MeshViewer() {
-  const [files, setFiles] = useState({
-    obj: null as File | null,
-    mtl: null as File | null,
-    texture: null as File | null,
+  const [files, setFiles] = useState<MeshFiles>({
+    obj: null,
+    mtl: null,
+    texture: null,
   })
 
-  const [urls, setUrls] = useState({
+  const [urls, setUrls] = useState<FileUrls>({
     obj: "",
     mtl: "",
     texture: "",
   })
 
-  const [folderData, setFolderData] = useState<{
-    refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
-  } | null>(null)
+  const [folderData, setFolderData] = useState<FolderData | null>(null)
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [useFolder, setUseFolder] = useState(false)
 
-  const [showStats, setShowStats] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(true)
 
-  const [rotation, setRotation] = useState([0, 0, 0] as [number, number, number])
-  // Lighting controls
-  const [lighting, setLighting] = useState({
-    intensity: 0.5,
-    ambientIntensity: 0.3,
-    lightPosition: [5, 5, 5] as [number, number, number],
+  const [rotation, setRotation] = useState<[number, number, number]>([0, 0, 0])\
+  const [lighting, setLighting] = useState<LightingSettings>({
+    intensity: 1.0,
+    ambientIntensity: 0.0,
+    lightPosition: [5, 5, 5],
     lightColor: "#ffffff",
     ambientColor: "#404060",
   })
 
-  // Create object URLs when files are uploaded
   useEffect(() => {
-    if (files.obj) setUrls((prev) => ({ ...prev, obj: URL.createObjectURL(files.obj!) }))
-    if (files.mtl) setUrls((prev) => ({ ...prev, mtl: URL.createObjectURL(files.mtl!) }))
-    if (files.texture) setUrls((prev) => ({ ...prev, texture: URL.createObjectURL(files.texture!) }))
+    if (urls.obj) URL.revokeObjectURL(urls.obj);
+    if (urls.mtl) URL.revokeObjectURL(urls.mtl);
+    if (urls.texture) URL.revokeObjectURL(urls.texture);
 
-    // Clean up URLs on unmount
+    const newUrls = { obj: "", mtl: "", texture: "" };
+    if (files.obj) newUrls.obj = URL.createObjectURL(files.obj);
+    if (files.mtl) newUrls.mtl = URL.createObjectURL(files.mtl);
+    if (files.texture) newUrls.texture = URL.createObjectURL(files.texture);
+
+    setUrls(newUrls);
+
     return () => {
-      if (urls.obj) URL.revokeObjectURL(urls.obj)
-      if (urls.mtl) URL.revokeObjectURL(urls.mtl)
-      if (urls.texture) URL.revokeObjectURL(urls.texture)
-    }
-  }, [files])
+      if (newUrls.obj) URL.revokeObjectURL(newUrls.obj);
+      if (newUrls.mtl) URL.revokeObjectURL(newUrls.mtl);
+      if (newUrls.texture) URL.revokeObjectURL(newUrls.texture);
+    };
+  }, [files]);
 
-  // Apply dark mode
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark")
@@ -70,37 +112,55 @@ export default function MeshViewer() {
     }
   }, [isDarkMode])
 
-  const handleFileUpload = (type: keyof typeof files, file: File) => {
+  const handleFileUpload = useCallback((type: keyof typeof files, file: File) => {
     setFiles((prev) => ({ ...prev, [type]: file }))
     setUseFolder(false)
-  }
+  }, []);
 
-  const handleFolderSelected = (data: {
-    refinedMesh: Record<string, { obj: string; mtl: string; png: string }>;
-  }) => {
+  const handleFolderSelected = useCallback((data: FolderData) => {
     setFolderData(data);
     const modelNames = Object.keys(data.refinedMesh);
     if (modelNames.length > 0) {
       setSelectedModels([modelNames[0]]);
       setUseFolder(true);
     }
-  }
+  }, []);
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen)
-  }
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => !prev)
+  }, []);
 
-  const updateLighting = (key: keyof typeof lighting, value: any) => {
-    setLighting((prev) => ({ ...prev, [key]: value }))
-  }
+  const updateLighting = useCallback((key: keyof LightingSettings, value: any) => {
+    setLighting(prev => ({ ...prev, [key]: value }))
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode(prev => !prev)
+  }, []);
+
+  const handleRotationChange = useCallback((axis: number, value: number) => {
+    setRotation(prev => {
+      const newRotation = [...prev] as [number, number, number];
+      newRotation[axis] = value;
+      return newRotation;
+    });
+  }, []);
+
+  const handleSelectedModelsChange = useCallback((models: string[]) => {
+    setSelectedModels(models);
+    setUseFolder(true);
+  }, []);
+
+  const sortedModelNames = useMemo(() => {
+    return folderData ? Object.keys(folderData.refinedMesh).sort() : [];
+  }, [folderData]);
 
   return (
     <div className={`w-full h-screen flex flex-col ${isDarkMode ? "dark" : ""}`}>
       <div className="flex flex-1 relative">
         {/* Collapsible Sidebar */}
         <div
-          className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${sidebarOpen ? "w-80" : "w-0 overflow-hidden"
-            }`}
+          className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${sidebarOpen ? "w-80" : "w-0 overflow-hidden"}`}
         >
           <div className="p-4 border-b overflow-y-auto h-full">
             <h1 className="text-xl font-bold mb-4">3D Mesh Viewer</h1>
@@ -109,55 +169,17 @@ export default function MeshViewer() {
               <div>
                 <h2 className="text-md font-semibold mb-2">Folder Selection</h2>
                 <FolderSelector onFolderSelected={handleFolderSelected} />
-                {folderData && Object.keys(folderData.refinedMesh).length > 0 && (
-                  <div className="mt-4">
-                    <Label className="mb-2 block">
-                      Select Models:
-                    </Label>
-                    <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                      {Object.keys(folderData.refinedMesh)
-                        .sort()
-                        .map((modelName) => (
-                          <div key={modelName} className="flex items-center space-x-2 py-1">
-                            <Checkbox
-                              id={`model-${modelName}`}
-                              checked={selectedModels.includes(modelName)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedModels(prev => [...prev, modelName]);
-                                } else {
-                                  setSelectedModels(prev => prev.filter(m => m !== modelName));
-                                }
-                                setUseFolder(true);
-                              }}
-                            />
-                            <Label htmlFor={`model-${modelName}`} className="cursor-pointer">
-                              {modelName}
-                            </Label>
-                          </div>
-                        ))}
-                    </div>
-                    <div className="mt-2 flex justify-between">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedModels([])}
-                      >
-                        Clear All
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedModels(Object.keys(folderData.refinedMesh))}
-                      >
-                        Select All
-                      </Button>
-                    </div>
-                  </div>
+
+                {folderData && sortedModelNames.length > 0 && (
+                  <ModelList
+                    modelNames={sortedModelNames}
+                    selectedModels={selectedModels}
+                    onSelectionChange={handleSelectedModelsChange}
+                  />
                 )}
               </div>
 
-              {!useFolder &&
+              {!useFolder && (
                 <div>
                   <div>
                     <h2 className="text-md font-semibold mb-2">Mesh Model</h2>
@@ -183,7 +205,7 @@ export default function MeshViewer() {
                     </div>
                   </div>
                 </div>
-              }
+              )}
             </div>
 
             <div className="space-y-4">
@@ -261,7 +283,7 @@ export default function MeshViewer() {
                       max={Math.PI * 2}
                       step={0.01}
                       value={[rotation[0]]}
-                      onValueChange={(value) => setRotation([value[0], rotation[1], rotation[2]])}
+                      onValueChange={(value) => handleRotationChange(0, value[0])}
                       className="flex-1"
                     />
                     <span className="w-12 text-right">{rotation[0].toFixed(2)}</span>
@@ -277,7 +299,7 @@ export default function MeshViewer() {
                       max={Math.PI * 2}
                       step={0.01}
                       value={[rotation[1]]}
-                      onValueChange={(value) => setRotation([rotation[0], value[0], rotation[2]])}
+                      onValueChange={(value) => handleRotationChange(1, value[0])}
                       className="flex-1"
                     />
                     <span className="w-12 text-right">{rotation[1].toFixed(2)}</span>
@@ -293,17 +315,12 @@ export default function MeshViewer() {
                       max={Math.PI * 2}
                       step={0.01}
                       value={[rotation[2]]}
-                      onValueChange={(value) => setRotation([rotation[0], rotation[1], value[0]])}
+                      onValueChange={(value) => handleRotationChange(2, value[0])}
                       className="flex-1"
                     />
                     <span className="w-12 text-right">{rotation[2].toFixed(2)}</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch id="show-stats" checked={showStats} onCheckedChange={setShowStats} />
-                <Label htmlFor="show-stats">Show Stats</Label>
               </div>
             </div>
           </div>
@@ -326,18 +343,16 @@ export default function MeshViewer() {
             variant="outline"
             size="icon"
             className="absolute top-4 right-4 z-10 bg-background/80 backdrop-blur-sm"
-            onClick={() => setIsDarkMode(!isDarkMode)}
+            onClick={toggleTheme}
           >
             {isDarkMode ? <Sun /> : <Moon />}
           </Button>
 
-          <Canvas
+          <LazyCanvas
             camera={{ position: [0, 0, 5], fov: 50 }}
             className="w-full h-full"
             style={{ background: isDarkMode ? "#111" : "#f5f5f5" }}
           >
-            {showStats && <Stats />}
-
             <SceneLighting
               intensity={lighting.intensity}
               ambientIntensity={lighting.ambientIntensity}
@@ -371,7 +386,7 @@ export default function MeshViewer() {
             )}
 
             <OrbitControls />
-          </Canvas>
+          </LazyCanvas>
         </div>
       </div>
     </div>

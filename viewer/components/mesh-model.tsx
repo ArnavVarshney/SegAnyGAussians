@@ -1,6 +1,4 @@
-"use client"
-
-import { useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo, memo } from "react"
 import { useThree } from "@react-three/fiber"
 import { MaterialCreator, MTLLoader, OBJLoader } from "three-stdlib"
 import * as THREE from "three"
@@ -14,14 +12,14 @@ interface MeshModelProps {
   doubleSided?: boolean
 }
 
-export default function MeshModel({
+const MeshModel = ({
   objUrl,
   mtlUrl,
   textureUrl,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   doubleSided = true,
-}: MeshModelProps) {
+}: MeshModelProps) => {
   const { scene } = useThree()
   const modelRef = useRef<THREE.Group | null>(null)
   const resourcesToCleanup = useRef<Array<{ dispose: () => void }>>([])
@@ -65,12 +63,12 @@ export default function MeshModel({
     const textureLoader = new THREE.TextureLoader()
     return new Promise((resolve, reject) => {
       textureLoader.load(
-        url,
+        url, 
         (texture) => {
           resourcesToCleanup.current.push(texture);
           resolve(texture);
-        },
-        undefined,
+        }, 
+        undefined, 
         reject
       )
     })
@@ -87,7 +85,7 @@ export default function MeshModel({
             if (child.geometry) {
               child.geometry.dispose();
             }
-
+            
             if (child.material) {
               if (Array.isArray(child.material)) {
                 child.material.forEach(material => material.dispose());
@@ -109,7 +107,7 @@ export default function MeshModel({
       try {
         const objLoader = new OBJLoader()
         let texture: THREE.Texture | undefined;
-
+        
         if (mtlUrl) {
           const mtlLoader = new MTLLoader()
           const mtl = await new Promise<MaterialCreator>((resolve, reject) => {
@@ -117,26 +115,26 @@ export default function MeshModel({
           })
           mtl.preload()
           objLoader.setMaterials(mtl)
-
+          
           Object.values(mtl.materials).forEach(material => {
             resourcesToCleanup.current.push(material);
           });
         }
-
+        
         if (textureUrl) {
           texture = await loadTexture(textureUrl);
         }
-
+        
         const obj = await new Promise<THREE.Group>((resolve, reject) => {
           objLoader.load(objUrl, resolve, undefined, reject)
         })
-
+        
         if (texture) {
           applyTexture(obj, texture);
         } else if (doubleSided) {
           applyTexture(obj);
         }
-
+        
         obj.position.set(position[0], position[1], position[2])
         scene.add(obj)
         modelRef.current = obj
@@ -152,3 +150,5 @@ export default function MeshModel({
 
   return null
 }
+
+export default memo(MeshModel);
