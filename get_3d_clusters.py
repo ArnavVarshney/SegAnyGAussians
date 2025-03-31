@@ -85,7 +85,7 @@ def cluster_3d_points(
 
     # Sample points for clustering (for efficiency)
     print("Sampling points for clustering...")
-    sample_mask = torch.rand(scale_conditioned_point_features.shape[0]) < 0.05
+    sample_mask = torch.rand(scale_conditioned_point_features.shape[0]) > 0.98
     sampled_point_features = scale_conditioned_point_features[sample_mask]
     normed_sampled_point_features = torch.nn.functional.normalize(
         sampled_point_features, dim=-1, p=2
