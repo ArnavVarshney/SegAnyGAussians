@@ -354,9 +354,6 @@ export default function MeshViewer() {
                     objUrl={folderData.refinedMesh[modelName].obj}
                     mtlUrl={folderData.refinedMesh[modelName].mtl}
                     textureUrl={folderData.refinedMesh[modelName].png}
-                    position={[0, 0, 0]}
-                    rotation={rotation}
-                    doubleSided={true}
                   />
                 )
               ))
