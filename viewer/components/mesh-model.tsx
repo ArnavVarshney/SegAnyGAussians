@@ -11,6 +11,7 @@ interface MeshModelProps {
   mtlUrl?: string
   textureUrl?: string
   position?: [number, number, number]
+  rotation?: [number, number, number]
   doubleSided?: boolean
 }
 
@@ -19,10 +20,15 @@ export default function MeshModel({
   mtlUrl,
   textureUrl,
   position = [0, 0, 0],
+  rotation = [0, 0, 0],
   doubleSided = false,
 }: MeshModelProps) {
   const { scene } = useThree()
   const modelRef = useRef<THREE.Group | null>(null)
+  const quaternion = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(rotation[0], rotation[1], rotation[2])
+  )
+  scene.setRotationFromQuaternion(quaternion)
 
   useEffect(() => {
     if (!objUrl) return
