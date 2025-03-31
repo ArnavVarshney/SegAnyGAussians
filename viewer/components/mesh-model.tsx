@@ -2,8 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { useThree } from "@react-three/fiber"
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader"
-import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader"
+import { MaterialCreator, MTLLoader, OBJLoader } from "three-stdlib"
 import * as THREE from "three"
 
 interface MeshModelProps {
@@ -46,7 +45,7 @@ export default function MeshModel({
 
         if (mtlUrl) {
           const mtlLoader = new MTLLoader()
-          const mtl = await new Promise<MTLLoader.MaterialCreator>((resolve, reject) => {
+          const mtl = await new Promise<MaterialCreator>((resolve, reject) => {
             mtlLoader.load(mtlUrl, resolve, undefined, reject)
           })
 
