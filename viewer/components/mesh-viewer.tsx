@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import dynamic from 'next/dynamic'
 import { OrbitControls } from "@react-three/drei"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Sun, Moon, Ruler } from "lucide-react"
+import { Sun, Moon, Ruler } from "lucide-react"
 import MeshModel from "./mesh-model"
 import SceneLighting from "./scene-lighting"
 import Sidebar from "./sidebar"
@@ -94,7 +94,6 @@ export default function MeshViewer() {
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [useFolder, setUseFolder] = useState(false)
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [showAxes, setShowAxes] = useState(false)
 
@@ -147,10 +146,6 @@ export default function MeshViewer() {
     }
   }, []);
 
-  const toggleSidebar = useCallback(() => {
-    setSidebarOpen(prev => !prev)
-  }, []);
-
   const updateLighting = useCallback((key: keyof LightingSettings, value: any) => {
     setLighting(prev => ({ ...prev, [key]: value }))
   }, []);
@@ -175,10 +170,8 @@ export default function MeshViewer() {
   return (
     <div className={`w-full h-screen flex flex-col ${isDarkMode ? "dark" : ""}`}>
       <div className="flex flex-1 relative">
-        {/* Collapsible Sidebar */}
-        <div
-          className={`h-full bg-background border-r transition-all duration-300 flex flex-col ${sidebarOpen ? "w-80" : "w-0 overflow-hidden"}`}
-        >
+        {/* Static Sidebar */}
+        <div className="h-full w-80 bg-background border-r flex flex-col">
           <Sidebar
             folderData={folderData}
             useFolder={useFolder}
@@ -195,16 +188,6 @@ export default function MeshViewer() {
 
         {/* Main Content */}
         <div className="flex-1 relative">
-          {/* Sidebar Toggle Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-sm"
-            onClick={toggleSidebar}
-          >
-            {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
-          </Button>
-
           {/* Theme Toggle Button */}
           <Button
             variant="outline"
