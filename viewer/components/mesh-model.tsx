@@ -28,6 +28,7 @@ export default function MeshModel({
   useEffect(() => {
     if (!objUrl) return
 
+
     const cleanupModel = () => {
       if (modelRef.current) {
         modelRef.current.traverse((child) => {
@@ -35,20 +36,24 @@ export default function MeshModel({
             if (child.geometry) {
               child.geometry.dispose()
             }
-
+    
             if (child.material) {
               const materials = Array.isArray(child.material)
                 ? child.material
                 : [child.material]
-
+    
               materials.forEach(material => {
                 if (material.map) material.map.dispose()
+                if (material.normalMap) material.normalMap.dispose()
+                if (material.bumpMap) material.bumpMap.dispose()
+                if (material.specularMap) material.specularMap.dispose()
+                if (material.envMap) material.envMap.dispose()      
                 material.dispose()
               })
             }
           }
         })
-
+    
         scene.remove(modelRef.current)
         modelRef.current = null
       }
