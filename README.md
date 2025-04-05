@@ -22,23 +22,6 @@ Download the pre-trained SAM ViT-H model:
 # Place in ./third_party/segment-anything/sam_ckpt
 ```
 
-## Data Preparation
-
-### Expected Data Structure
-```
-./data
-    /360_v2
-        /garden
-            /images
-            /images_2
-            /images_4
-            /images_8
-            /sparse
-            /features
-            /sam_masks
-            /mask_scales
-```
-
 ## Workflow
 
 ### 1. Pre-train 3D Gaussians
@@ -68,24 +51,6 @@ python train_contrastive_feature.py -m <path to pre-trained 3DGS model> --iterat
 ```bash
 python saga_gui.py --model_path <path to pre-trained 3DGS model>
 ```
-
-#### Controls
-- **Navigation**: Left-drag (rotate), Middle-drag (pan)
-- **Segmentation**: Right-click to place point prompts
-
-#### GUI Options
-- **Scale**: Controls 3D scale for segmentation and clustering
-- **Score Threshold**: Sets segmentation similarity threshold
-- **Viewing Modes**: RGB, PCA, SIMILARITY, 3D CLUSTER
-- **Segmentation Modes**: Single-click or multi-click
-
-#### Actions
-- **segment3D**: Execute 3D segmentation
-- **roll back/clear**: Undo actions
-- **save as**: Save segmentation results to `./segmentation_res/your_name.pt`
-- **cluster3d**: Generate clustering results
-- **reshuffle_cluster_color**: Change cluster colors
-
 ## Rendering Results
 
 ### Render Segmented Objects
