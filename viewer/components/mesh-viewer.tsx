@@ -110,7 +110,7 @@ export default function MeshViewer() {
   const [showAxes, setShowAxes] = useState(false)
 
   const [lighting, setLighting] = useState<LightingSettings>({
-    intensity: 1.0,
+    intensity: 2.0,
     ambientIntensity: 0.0,
     lightPosition: [-5, -5, -5],
     lightColor: "#ffffff",
@@ -252,8 +252,8 @@ export default function MeshViewer() {
               // stencil: false,
               // depth: true,
             }}
-            // dpr={[1, 2]}
-            // performance={{ min: 0.5 }}
+            dpr={[1, 2]}
+            performance={{ min: 0.5 }}
           >
             <SceneLighting
               intensity={lighting.intensity}
