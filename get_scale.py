@@ -19,10 +19,6 @@ import os
 
 FEATURE_DIM = 32
 
-DATA_ROOT = "./data/nerf_llff_data_for_3dgs/"
-# MODEL_PATH = './output/figurines_lerf_poses/'
-# MODEL_PATH = './output/figurines/'
-
 ALLOW_PRINCIPLE_POINT_SHIFT = False
 
 

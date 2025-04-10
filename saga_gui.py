@@ -639,7 +639,7 @@ class GaussianSplattingGUI:
 
         print(f"Saving {num_clusters} cluster masks...")
         skip = 0
-        
+
         all_clusters_info = []
 
         for cluster_id in range(num_clusters):
@@ -665,7 +665,7 @@ class GaussianSplattingGUI:
                 "cluster_id": cluster_id,
                 "num_points": num_points,
                 "confidence_threshold": threshold,
-                "mask_path": f"./segmentation_res/clusters/{cluster_id}/mask.pt"
+                "mask_path": f"./segmentation_res/clusters/{cluster_id}/mask.pt",
             }
             all_clusters_info.append(cluster_info)
 
@@ -673,21 +673,24 @@ class GaussianSplattingGUI:
             torch.save(final_mask, f"./segmentation_res/clusters/{cluster_id}/mask.pt")
 
         import json
+
         global_info = {
             "total_clusters": num_clusters,
             "valid_clusters": num_clusters - skip,
             "min_points_threshold": self.opt.MAX_POINTS,
             "creation_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "clusters": all_clusters_info
+            "clusters": all_clusters_info,
         }
-        
+
         with open("./segmentation_res/clusters/info.json", "w") as f:
             json.dump(global_info, f, indent=2)
 
         print(
             f"All {num_clusters - skip} cluster masks saved to ./segmentation_res/clusters/"
         )
-        print(f"Global cluster information saved to ./segmentation_res/clusters/info.json")
+        print(
+            f"Global cluster information saved to ./segmentation_res/clusters/info.json"
+        )
 
     def render_all_cluster_masks(self):
         from gaussian_renderer import render
@@ -1236,9 +1239,7 @@ class GaussianSplattingGUI:
         top_category = categories[indices[0]]
         confidence = values[0].item() * 100
 
-        with dpg.window(
-            label="Object Identification Results", width=300, height=200
-        ):
+        with dpg.window(label="Object Identification Results", width=300, height=200):
             dpg.add_text(f"Identified as: {top_category}")
             dpg.add_text(f"Confidence: {confidence:.2f}%")
             dpg.add_text("Other possibilities:")

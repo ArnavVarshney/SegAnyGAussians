@@ -117,9 +117,6 @@ def training(
         else torch.zeros([dataset.feature_dim], dtype=torch.float32)
     )
 
-    iter_start = time.time
-    iter_end = time.time
-
     first_iter = 0
     viewpoint_stack = None
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
@@ -157,8 +154,6 @@ def training(
         )
 
     for iteration in range(first_iter, opt.iterations + 1):
-        start_time = iter_start()
-
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
@@ -289,7 +284,6 @@ def training(
             smooth_K=opt.smooth_K,
         )
         rendered_features = render_pkg_feat["render"]
-        print(rendered_features.shape)
 
         rendered_feature_norm = rendered_features.norm(dim=0, p=2).mean()
         rendered_feature_norm_reg = (1 - rendered_feature_norm) ** 2
@@ -316,8 +310,6 @@ def training(
             .repeat([sampled_scales.shape[0], 1, 1, 1])
         )
 
-        print(feature_with_scale.shape)
-        print(gates.shape)
         feature_with_scale = feature_with_scale * gates.unsqueeze(-1).unsqueeze(-1)
 
         sampled_feature_with_scale = feature_with_scale[:, :, sampled_ray]
@@ -401,8 +393,6 @@ def training(
 
         feature_gaussians.optimizer.step()
         feature_gaussians.optimizer.zero_grad(set_to_none=True)
-
-        end_time = iter_end()
 
         if iteration % 10 == 0:
             progress_bar.set_postfix(

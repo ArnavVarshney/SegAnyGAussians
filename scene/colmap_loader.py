@@ -66,26 +66,6 @@ def qvec2rotmat(qvec):
     )
 
 
-def rotmat2qvec(R):
-    Rxx, Ryx, Rzx, Rxy, Ryy, Rzy, Rxz, Ryz, Rzz = R.flat
-    K = (
-        np.array(
-            [
-                [Rxx - Ryy - Rzz, 0, 0, 0],
-                [Ryx + Rxy, Ryy - Rxx - Rzz, 0, 0],
-                [Rzx + Rxz, Rzy + Ryz, Rzz - Rxx - Ryy, 0],
-                [Ryz - Rzy, Rzx - Rxz, Rxy - Ryx, Rxx + Ryy + Rzz],
-            ]
-        )
-        / 3.0
-    )
-    eigvals, eigvecs = np.linalg.eigh(K)
-    qvec = eigvecs[[3, 0, 1, 2], np.argmax(eigvals)]
-    if qvec[0] < 0:
-        qvec *= -1
-    return qvec
-
-
 class Image(BaseImage):
     def qvec2rotmat(self):
         return qvec2rotmat(self.qvec)
@@ -319,28 +299,3 @@ def read_extrinsics_text(path):
                     point3D_ids=point3D_ids,
                 )
     return images
-
-
-def read_colmap_bin_array(path):
-    """
-    Taken from https://github.com/colmap/colmap/blob/dev/scripts/python/read_dense.py
-
-    :param path: path to the colmap binary file.
-    :return: nd array with the floating point values in the value
-    """
-    with open(path, "rb") as fid:
-        width, height, channels = np.genfromtxt(
-            fid, delimiter="&", max_rows=1, usecols=(0, 1, 2), dtype=int
-        )
-        fid.seek(0)
-        num_delimiter = 0
-        byte = fid.read(1)
-        while True:
-            if byte == b"&":
-                num_delimiter += 1
-                if num_delimiter >= 3:
-                    break
-            byte = fid.read(1)
-        array = np.fromfile(fid, np.float32)
-    array = array.reshape((width, height, channels), order="F")
-    return np.transpose(array, (1, 0, 2)).squeeze()
