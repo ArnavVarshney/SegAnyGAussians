@@ -14,9 +14,9 @@ conda activate saga
 echo "Training the scene model"
 CUDA_LAUNCH_BLOCKING=1 python -u train_scene.py -s ~/datasets/garden -m ./output/garden --optimizer_type sparse_adam
 echo "Training the segmentation model"
-CUDA_LAUNCH_BLOCKING=1 python -u extract_segment_everything_masks.py --image_root  ~/datasets/garden --sam_checkpoint_path ./submodules/segment-anything/sam_ckpt/sam_vit_h_4b8939.pth --num_gpus 2 --overwrite
+CUDA_LAUNCH_BLOCKING=1 python -u extract_segment_everything_masks.py --image_root ~/datasets/garden --sam_checkpoint_path ./submodules/segment-anything/sam_ckpt/sam_vit_h_4b8939.pth --num_gpus 8 --overwrite
 echo "Getting the scale"
-CUDA_LAUNCH_BLOCKING=1 python -u  get_scale.py --image_root ~/datasets/garden --model_path ./output/garden --feature_dim 32
+CUDA_LAUNCH_BLOCKING=1 python -u get_scale.py --image_root ~/datasets/garden --model_path ./output/garden
 # echo "Getting the clip features"
 # CUDA_LAUNCH_BLOCKING=1 python get_clip_features.py --image_root ~/datasets/garden
 echo "Training the contrastive model"
